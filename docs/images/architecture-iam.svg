@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  </defs>
+  <rect x="0" y="0" width="900" height="470" fill="#ffffff"/>
+
+  <!-- Utilisateur -->
+  <rect x="20" y="190" width="140" height="70" rx="10" fill="#eef2ff" stroke="#4f46e5"/>
+  <text x="90" y="220" text-anchor="middle" font-weight="600">Utilisateur</text>
+  <text x="90" y="240" text-anchor="middle" fill="#475569">navigateur web</text>
+
+  <!-- IAM -->
+  <rect x="230" y="40" width="380" height="390" rx="12" fill="#f8fafc" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="420" y="66" text-anchor="middle" font-weight="700" font-size="15">IAM ACSI (IAM-Local, PHP)</text>
+
+  <rect x="250" y="85" width="165" height="62" rx="8" fill="#fff" stroke="#64748b"/>
+  <text x="332" y="108" text-anchor="middle" font-weight="600">Connexion + MFA</text>
+  <text x="332" y="127" text-anchor="middle" fill="#475569" font-size="11">login.php · mfa.php</text>
+
+  <rect x="430" y="85" width="165" height="62" rx="8" fill="#fff" stroke="#64748b"/>
+  <text x="512" y="108" text-anchor="middle" font-weight="600">Portail / profil</text>
+  <text x="512" y="127" text-anchor="middle" fill="#475569" font-size="11">portal.php · profile.php</text>
+
+  <rect x="250" y="160" width="165" height="62" rx="8" fill="#fff" stroke="#64748b"/>
+  <text x="332" y="183" text-anchor="middle" font-weight="600">SSO maison</text>
+  <text x="332" y="202" text-anchor="middle" fill="#475569" font-size="11">sso/authorize · api/sso/validate</text>
+
+  <rect x="430" y="160" width="165" height="62" rx="8" fill="#fff" stroke="#64748b"/>
+  <text x="512" y="183" text-anchor="middle" font-weight="600">OAuth 2.0 / OIDC</text>
+  <text x="512" y="202" text-anchor="middle" fill="#475569" font-size="11">oauth.php · api/oauth/*</text>
+
+  <rect x="250" y="235" width="345" height="62" rx="8" fill="#fff" stroke="#64748b"/>
+  <text x="422" y="258" text-anchor="middle" font-weight="600">Console d'administration</text>
+  <text x="422" y="277" text-anchor="middle" fill="#475569" font-size="11">utilisateurs · applications · rôles et permissions · audit · sessions</text>
+
+  <rect x="250" y="320" width="345" height="90" rx="8" fill="#ecfeff" stroke="#0e7490"/>
+  <text x="422" y="345" text-anchor="middle" font-weight="600">Base MySQL iam_local</text>
+  <text x="422" y="366" text-anchor="middle" fill="#475569" font-size="11">users · applications · roles · permissions · user_roles</text>
+  <text x="422" y="384" text-anchor="middle" fill="#475569" font-size="11">oauth_clients · oauth_codes · refresh_tokens · oauth_keys</text>
+  <text x="422" y="402" text-anchor="middle" fill="#475569" font-size="11">sessions · audit_logs · password_policy</text>
+
+  <!-- Applications -->
+  <rect x="680" y="70" width="200" height="80" rx="10" fill="#f0fdf4" stroke="#15803d"/>
+  <text x="780" y="100" text-anchor="middle" font-weight="600">Applications PHP</text>
+  <text x="780" y="120" text-anchor="middle" fill="#475569" font-size="11">client/iam_client.php</text>
+  <text x="780" y="137" text-anchor="middle" fill="#475569" font-size="11">(SSO maison, jeton à usage unique)</text>
+
+  <rect x="680" y="190" width="200" height="80" rx="10" fill="#f0fdf4" stroke="#15803d"/>
+  <text x="780" y="220" text-anchor="middle" font-weight="600">Applications OIDC</text>
+  <text x="780" y="240" text-anchor="middle" fill="#475569" font-size="11">Laravel · Django · Spring</text>
+  <text x="780" y="257" text-anchor="middle" fill="#475569" font-size="11">Next.js · Go · autre</text>
+
+  <rect x="680" y="310" width="200" height="70" rx="10" fill="#fff7ed" stroke="#c2410c"/>
+  <text x="780" y="338" text-anchor="middle" font-weight="600">Serveur SMTP</text>
+  <text x="780" y="358" text-anchor="middle" fill="#475569" font-size="11">envoi des codes MFA</text>
+
+  <!-- Flèches -->
+  <line x1="160" y1="215" x2="248" y2="120" stroke="#475569" marker-end="url(#a)"/>
+  <line x1="160" y1="235" x2="248" y2="265" stroke="#475569" marker-end="url(#a)"/>
+  <line x1="415" y1="190" x2="680" y2="115" stroke="#475569" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  <line x1="595" y1="195" x2="678" y2="225" stroke="#475569" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  <line x1="595" y1="350" x2="678" y2="345" stroke="#475569" marker-end="url(#a)"/>
+  <text x="625" y="282" fill="#475569" font-size="11" transform="rotate(20 625 282)">codes, jetons</text>
+</svg>
