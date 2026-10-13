@@ -304,7 +304,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$apps  = $db->query('SELECT * FROM applications ORDER BY name')->fetchAll();
+$appSortOptions = iam_app_sort_options('applications');
+$appSort = iam_list_sort('admin_apps', $appSortOptions, 'nom');
+$apps  = $db->query('SELECT * FROM applications ORDER BY ' . $appSortOptions[$appSort][1])->fetchAll();
 $perms = $db->query('SELECT p.*, a.name AS app_name FROM permissions p INNER JOIN applications a ON a.id = p.application_id ORDER BY a.name, p.name')->fetchAll();
 $permsByApp = [];
 foreach ($perms as $p) $permsByApp[$p['application_id']][] = $p;
@@ -463,6 +465,11 @@ function iam_bridge_ui(array $cfg): void
 
 <?php if ($err): ?><div class="alert alert-danger"><?php echo htmlspecialchars($err); ?></div><?php endif; ?>
 <?php if ($msg): ?><div class="alert alert-<?php echo $type === 'warning' ? 'warning' : 'success'; ?>"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
+
+<div class="d-flex align-center mb-3" style="justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <span class="text-muted"><?php echo count($apps); ?> application(s)</span>
+    <?php echo iam_sort_select($appSortOptions, $appSort); ?>
+</div>
 
 <div class="cards-grid mb-3">
     <?php foreach ($apps as $a): ?>

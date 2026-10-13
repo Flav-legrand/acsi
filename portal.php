@@ -14,7 +14,9 @@ if (!empty($_SESSION['iam_mfa_required']) && empty($_SESSION['iam_mfa_verified']
 }
 
 $user = $_SESSION['iam_user'];
-$apps = iam_user_apps((int) $user['id']);
+$appSortOptions = iam_app_sort_options('a', false);
+$appSort = iam_list_sort('portal', $appSortOptions, 'nom');
+$apps = iam_user_apps((int) $user['id'], $appSort);
 $isAdmin = iam_user_is_admin((int) $user['id']);
 $roles = iam_user_roles((int) $user['id']);
 
@@ -90,6 +92,10 @@ $now = time();
                 <i class="fas fa-triangle-exclamation"></i>
                 Vous devez <a href="<?php echo IAM_BASE_URL; ?>/profile.php?force=1">changer votre mot de passe</a> avant de poursuivre.
             </div>
+        <?php endif; ?>
+
+        <?php if (count($apps) > 1): ?>
+            <div class="d-flex mb-3" style="justify-content:flex-end;"><?php echo iam_sort_select($appSortOptions, $appSort); ?></div>
         <?php endif; ?>
 
         <div class="cards-grid">

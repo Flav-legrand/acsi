@@ -3,6 +3,20 @@
 Format : une entrée par correctif, la plus récente en haut.
 Aucune des failles ci-dessous n'a fait l'objet d'une référence CVE : elles ont été relevées en revue interne avant toute diffusion publique.
 
+## [1.1.0] — 2026-10-13
+
+### Ajout — tri des listes d'applications
+
+- **Où** : portail utilisateur (`portal.php`), console › Applications (`admin/apps.php`), console › OAuth / OIDC (`admin/oidc_apps.php`).
+- **Tris** :
+  - nom (A → Z, Z → A), date d'ajout (récentes ou anciennes d'abord), code technique ;
+  - statut (actives d'abord), sauf sur le portail, qui n'affiche que les applications actives ;
+  - OAuth / OIDC uniquement : dernière utilisation et plateforme.
+- **Mémorisation** : le dernier tri choisi est conservé en session, pour chaque liste.
+- **Sécurité** : seules des clés de tri prédéfinies sont acceptées (`?tri=`) ; aucune expression SQL ne vient du navigateur.
+- **Tris par défaut inchangés** : nom pour le portail et les applications, date d'ajout récente pour OAuth / OIDC.
+- **Impact** : aucun sur les applications de test.
+
 ## [1.0.3] — 2026-10-13
 
 ### Correctif — `install.php` écrivait un `config.php` incomplet

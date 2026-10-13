@@ -268,15 +268,68 @@ function iam_parse_csv(string $text): array
     return ['headers' => $headers, 'rows' => array_slice($rows, 1)];
 }
 
-function iam_user_apps(int $user_id): array
+/**
+ * Tris proposés pour les listes d'applications : clé => [libellé, ORDER BY].
+ * $a : alias SQL de la table applications. La clé vient de l'URL : seules
+ * les clés de cette liste sont acceptées (jamais de SQL venant du client).
+ */
+function iam_app_sort_options(string $a = 'a', bool $withStatus = true): array
 {
+    $options = [
+        'nom'      => ['Nom (A → Z)', "$a.name ASC"],
+        'nom_desc' => ['Nom (Z → A)', "$a.name DESC"],
+        'recent'   => ['Date d’ajout (récentes d’abord)', "$a.created_at DESC, $a.id DESC"],
+        'ancien'   => ['Date d’ajout (anciennes d’abord)', "$a.created_at ASC, $a.id ASC"],
+        'code'     => ['Code technique', "$a.code ASC"],
+    ];
+    if ($withStatus) {
+        $options['statut'] = ['Statut (actives d’abord)', "$a.active DESC, $a.name ASC"];
+    }
+    return $options;
+}
+
+/**
+ * Tri choisi pour une liste : paramètre ?tri=… validé, sinon dernier choix
+ * mémorisé en session pour cette liste, sinon $default.
+ */
+function iam_list_sort(string $list, array $options, string $default): string
+{
+    $asked = (string) ($_GET['tri'] ?? '');
+    if ($asked !== '' && isset($options[$asked])) {
+        if (session_status() === PHP_SESSION_ACTIVE) $_SESSION['iam_sort'][$list] = $asked;
+        return $asked;
+    }
+    $saved = (string) ($_SESSION['iam_sort'][$list] ?? '');
+    return isset($options[$saved]) ? $saved : $default;
+}
+
+/** Liste déroulante « Trier par » (formulaire GET, envoi au changement). */
+function iam_sort_select(array $options, string $current, array $keep = []): string
+{
+    $html = '<form method="GET" class="d-flex align-center gap-2" style="margin:0;">';
+    foreach ($keep as $name => $value) {
+        if ($name === 'tri' || $name === 'page' || is_array($value)) continue;
+        $html .= '<input type="hidden" name="' . htmlspecialchars((string) $name) . '" value="' . htmlspecialchars((string) $value) . '">';
+    }
+    $html .= '<label for="iam-tri" class="text-muted" style="font-size:13px; white-space:nowrap;"><i class="fas fa-arrow-down-wide-short"></i> Trier par</label>'
+           . '<select id="iam-tri" name="tri" class="form-control" style="width:auto;" onchange="this.form.submit()">';
+    foreach ($options as $key => [$label]) {
+        $html .= '<option value="' . htmlspecialchars($key) . '"' . ($key === $current ? ' selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+    }
+    return $html . '</select><noscript><button class="btn btn-outline btn-sm">OK</button></noscript></form>';
+}
+
+function iam_user_apps(int $user_id, string $sort = 'nom'): array
+{
+    $options = iam_app_sort_options('a', false);
+    $orderBy = ($options[$sort] ?? $options['nom'])[1];
     $db = db();
-    $stmt = $db->prepare('SELECT a.id, a.code, a.name, a.description, a.url, a.logo, a.color, a.icon, a.is_system
+    $stmt = $db->prepare('SELECT a.id, a.code, a.name, a.description, a.url, a.logo, a.color, a.icon, a.is_system, a.created_at
         FROM applications a
         INNER JOIN user_roles ur ON ur.application_id = a.id AND ur.user_id = ?
         WHERE a.active = 1
         GROUP BY a.id
-        ORDER BY a.name');
+        ORDER BY ' . $orderBy);
     $stmt->execute([$user_id]);
     return $stmt->fetchAll();
 }

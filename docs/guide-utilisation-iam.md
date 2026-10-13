@@ -121,6 +121,14 @@ Après la connexion, le portail (`portal.php`) affiche **uniquement les applicat
 
 *Figure 5 — Portail d'un utilisateur : une application accessible et son rôle*
 
+Dès que vous avez plusieurs applications, la liste **Trier par** (en haut à droite) les classe :
+
+- par **nom** (A → Z ou Z → A) ;
+- par **date d'ajout** (récentes ou anciennes d'abord) ;
+- par **code technique**.
+
+Votre choix est conservé pendant toute la session.
+
 Un administrateur IAM voit en plus la rubrique *Administration* dans le menu de gauche :
 
 ![Portail administrateur](./captures/08-portail-administrateur.png)
@@ -267,6 +275,15 @@ L'IAM gère deux familles d'applications :
 ![Applications](./captures/15-admin-applications.png)
 
 *Figure 15 — Liste des applications : permissions, accès utilisateurs, intégration SSO*
+
+La liste **Trier par**, au-dessus des cartes, classe les applications :
+
+- par nom (A → Z ou Z → A) ;
+- par date d'ajout (récentes ou anciennes d'abord) ;
+- par code technique ;
+- par statut (actives d'abord).
+
+La liste **OAuth / OIDC** propose, dans sa barre de filtres, les mêmes tris, plus la **dernière utilisation** et la **plateforme**. Chaque liste mémorise le dernier tri choisi pendant la session.
 
 ## Créer une application
 
