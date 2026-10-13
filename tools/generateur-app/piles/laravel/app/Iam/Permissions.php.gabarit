@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Iam;
+
+/**
+ * Catalogue des permissions de @@NOM_APP@@ (@@CODE_APP@@).
+ *
+ * GÉNÉRÉ depuis la base de l'IAM le @@DATE@@ : les codes sont exacts
+ * par construction. Une faute de frappe sur un code ne produit aucun
+ * avertissement, seulement un 403 à l'exécution — d'où l'intérêt
+ * d'utiliser ces constantes plutôt que des chaînes.
+ *
+ * Pour ajouter une permission : la déclarer dans l'IAM (sql/ ou
+ * Administration > Rôles), puis régénérer ce fichier :
+ *   python generer.py --app @@CODE_APP@@ --piles laravel --sortie ... --force
+ *
+ * @@NB_PERMS@@ permissions, @@NB_ROLES@@ rôles locaux.
+ */
+final class Permissions
+{
+@@PHP_PERM_CONSTS@@
+
+    /**
+     * Modules de l'application et actions déclarées pour chacun.
+     *
+     * @var array<string, array{label: string, actions: array<string, string>}>
+     */
+    public const MODULES = [
+@@PHP_MODULES@@
+    ];
+
+    /**
+     * Matrice rôles × permissions telle que déclarée dans l'IAM au
+     * moment de la génération. Sert UNIQUEMENT aux tests
+     * (php artisan iam:test-login) : à l'exécution, la seule source de
+     * vérité est la liste reçue de l'IAM à la connexion.
+     *
+     * @var array<string, string[]>
+     */
+    public const ROLE_MATRIX = [
+@@PHP_MATRIX@@
+    ];
+
+    /**
+     * Comptes de test déclarés dans l'IAM pour cette application.
+     *
+     * @var array<int, array{email: string, username: string, name: string, roles: string[]}>
+     */
+    public const TEST_USERS = [
+@@PHP_TEST_USERS@@
+    ];
+
+    /** Code complet d'une permission : Permissions::code('contacts', 'edit'). */
+    public static function code(string $module, string $action): string
+    {
+        return '@@CODE_APP@@.'.$module.'.'.$action;
+    }
+}

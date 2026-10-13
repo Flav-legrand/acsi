@@ -1,0 +1,39 @@
+<?php
+
+use App\Http\Controllers\IamAuthController;
+use App\Http\Controllers\ModuleController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| @@NOM_APP@@ — routes web
+|--------------------------------------------------------------------------
+| Généré le @@DATE@@ par tools/generateur-app (pile laravel).
+|
+| Authentification : IAM-Local (OIDC + PKCE, SSO maison en option).
+|   iam.auth                → utilisateur connecté via l'IAM, avec un rôle
+|                             sur l'application
+|   iam.permission:<code>   → permission IAM exigée (plusieurs = l'une d'elles)
+*/
+
+// ── Authentification IAM (publique) ───────────────────────────────
+Route::get('/login', [IamAuthController::class, 'login'])->name('iam.login');
+Route::get('/login/oidc', [IamAuthController::class, 'loginOidc'])->name('iam.login.oidc');
+Route::get('/login/sso', [IamAuthController::class, 'loginSso'])->name('iam.login.sso');
+Route::get('/callback', [IamAuthController::class, 'callback'])->name('iam.callback');
+Route::get('/callback/sso', [IamAuthController::class, 'callbackSso'])->name('iam.callback.sso');
+Route::get('/logged-out', [IamAuthController::class, 'loggedOut'])->name('iam.logged-out');
+Route::post('/logout', [IamAuthController::class, 'logout'])->name('iam.logout');
+
+// ── Application (connexion IAM obligatoire) ───────────────────────
+Route::middleware('iam.auth')->group(function () {
+    Route::get('/', [ModuleController::class, 'home'])->name('home');
+
+    // Diagnostic de session : environnement local uniquement.
+    if (app()->environment('local')) {
+        Route::get('/iam/me', [IamAuthController::class, 'me'])->name('iam.me');
+    }
+
+    // Modules : une permission IAM par action.
+@@PHP_ROUTES@@
+});

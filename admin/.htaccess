@@ -1,0 +1,15 @@
+# ============================================================
+# IAM-Local — Admin : sécurité
+# L'authentification est gérée par _guard.php (inclus dans toutes
+# les pages admin). Ce fichier ne contient aucun chemin codé en dur.
+# ============================================================
+
+# ── Sécurité ─────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+</IfModule>
+
+Options -Indexes

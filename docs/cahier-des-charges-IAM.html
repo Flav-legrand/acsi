@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Cahier des charges — IAM-Local (IAM ACSI)</title>
+<style>
+  :root { --primary:#4361ee; --primary-dark:#3a0ca3; --dark:#1b2030; --muted:#64748b; --border:#e3e8f0; }
+  * { box-sizing: border-box; }
+  @page { size: A4 landscape; margin: 12mm; }
+  html, body {
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    color: #212529; font-size: 12px; line-height: 1.5;
+    margin: 0; padding: 0;
+  }
+  h1 { font-size: 26px; color: var(--primary-dark); margin: 0 0 6px; }
+  h2 { font-size: 17px; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 4px; margin: 26px 0 12px; }
+  h3 { font-size: 14px; color: var(--dark); margin: 16px 0 8px; }
+  p { margin: 6px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid var(--border); padding: 6px 9px; text-align: left; font-size: 11.5px; vertical-align: top; }
+  th { background: #f1f4fb; }
+  code { background: #f1f4fb; border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; font-size: 11px; }
+  figure { margin: 12px 0; page-break-inside: avoid; }
+  figure svg { max-width: 100%; height: auto; }
+  @page activity { size: A3 landscape; margin: 12mm; }
+  @page activity-portrait { size: A3 portrait; margin: 12mm; }
+  .activity-page { page: activity; page-break-before: always; break-before: page; page-break-after: always; break-after: page; }
+  .activity-page--portrait { page: activity-portrait; }
+  .activity-page figure { margin: 2mm 0; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+  .activity-page figure svg { display: block; width: auto; height: 225mm; max-width: 100%; margin: 0 auto; }
+  .activity-page--portrait figure svg { height: 320mm; }
+  .cover { text-align: center; padding-top: 60px; page-break-after: always; }
+  .cover .logo { width: 112px; height: 112px; display:block; object-fit:contain; margin:0 auto 18px; }
+  .cover h1 { font-size: 30px; }
+  .cover h2 { border: none; font-weight: 400; color: var(--muted); font-size: 17px; }
+  .cover table { width: 60%; margin: 30px auto; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .toc p { margin: 3px 0; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:10.5px; font-weight:600;
+           background:#eef2ff; color:var(--primary); border:1px solid #dbe4ff; }
+  .note { background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b; padding:8px 12px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<!-- ================= AIRE DE GARDE ================= -->
+<div class="cover">
+  <img class="logo" src="../images/acsi.jpg" alt="Logo ACSI">
+  <h1>Cahier des charges technique et fonctionnel</h1>
+  <h2>IAM-Local — Plateforme IAM « IAM ACSI »<br>Gestion des identités et des accès, SSO &amp; MFA</h2>
+  <table>
+    <tr><th>Version</th><td>1.0</td></tr>
+    <tr><th>Date</th><td>21 septembre 2026</td></tr>
+    <tr><th>Statut</th><td>Validé — implémentation livrée (PHP natif + MySQL)</td></tr>
+    <tr><th>Documentation incluse</th><td>Diagramme de classes (17 entités) · Diagrammes d'activité (SSO, Connexion &amp; MFA)</td></tr>
+  </table>
+</div>
+
+<h2>Sommaire</h2>
+<div class="toc">
+  <p>1. Contexte et objectifs</p>
+  <p>2. Périmètre fonctionnel</p>
+  <p>3. Diagramme de classes (modèle de données — 17 entités)</p>
+  <p>4. Diagrammes d'activité (SSO · Connexion &amp; MFA)</p>
+  <p>5. Architecture technique et sécurité</p>
+  <p>6. Environnement et exigences</p>
+  <p>7. Livrables et jalons</p>
+</div>
+
+<h2>1. Contexte et objectifs</h2>
+<p>La structure met à disposition plusieurs applications Web internes (gestion de présence, gestion de salaire, gestion scolaire, etc.), chacune
+gérée historiquement par son propre mécanisme de connexion et d'utilisateurs. Ce cloisonnement impose une multiplicité de comptes, de mots de passe
+et de table d'utilisateurs à maintenir.</p>
+<p>Le projet <strong>IAM-Local (IAM ACSI)</strong> vise à centraliser :</p>
+<ul>
+  <li><strong>l'Identité</strong> — un référentiel unique d'utilisateurs, avec organisation hiérarchique et statut de compte ;</li>
+  <li><strong>la Politique de sécurité</strong> — politique de mot de passe, verrouillage anti force brute, expiration, sessions ;</li>
+  <li><strong>la Vérification renforcée (MFA)</strong> — code OTP à usage unique envoyé par e-mail (SMTP), affiché en mode démonstration ;</li>
+  <li><strong>l'Accès (SSO)</strong> — Single Sign-On par jeton à usage unique : une connexion IAM donne accès aux applications enregistrées
+       (accès fluide via le portail, ressaisie facultative sur lien direct) ;</li>
+  <li><strong>la Gouvernance (RBAC)</strong> — rôles, permissions, affectations utilisateur/rôle/application, journal d'audit complet ;</li>
+  <li><strong>l'Administration graphique</strong> — une console de gestion ne nécessitant aucune manipulation SQL en exploitation.</li>
+</ul>
+<p class="note"><strong>Périmètre.</strong> Le présent document décrit l'existant implémenté (version 1.0.0), qui sert de socle au déploiement et aux évolutions ultérieures.</p>
+
+<h2>2. Périmètre fonctionnel</h2>
+<h3>2.1 Authentification</h3>
+<ul>
+  <li>Connexion par identifiant (e-mail) et mot de passe haché (bcrypt via <code>password_hash</code>).</li>
+  <li>Comptes avec statuts <em>active / inactive / locked / pending</em>, premier mot de passe imposé
+      (<code>must_change_password = 1</code>), expiration de mot de passe configurable.</li>
+  <li>Anti force brute : <strong>5 échecs autorisés</strong> → verrouillage <strong>30 min</strong> (tentatives journalisées dans <code>login_attempts</code>).</li>
+  <li>Double vérification MFA par e-mail : OTP de <strong>6 chiffres, valable 5 minutes, 5 essais max</strong>
+      (<code>MFA_FORCE_ALL = true</code>, sauf administrateurs).</li>
+  <li><strong>Connexion sans mot de passe</strong> : e-mail ou téléphone + code OTP à usage unique envoyé par e-mail
+      (<code>otp_login.php</code>, canal d'envoi <code>email</code>), verrouillage renforcé, reprise en <code>?resend=1</code>.</li>
+  <li>Session PHP dédiée <code>iam_session</code> (durée 3600 s, inactivité 1800 s), sessions révocables depuis l'administration.</li>
+</ul>
+
+<h3>2.2 SSO applicatif</h3>
+<ul>
+  <li>Entrepôt <code>sso/authorize.php?app=CODE&amp;return=URL[&amp;prompt=login]</code> : vérifie l'application, la session IAM,
+      le MFA, l'expiration du mot de passe et l'accès de l'utilisateur, puis émet un <strong>jeton à usage unique</strong>
+      (60 s, enregistré dans <code>sso_tokens</code>).</li>
+  <li>Fichier garde généré <code>iam-sso-&lt;code&gt;.php</code> (déployé automatiquement via l'administrateur ou téléchargeable ;
+      chargé en <code>auto_prepend_file</code> via .htaccess) : session isolée côté application, validation du jeton
+      via <code>api/sso/validate.php</code>, reconstruction de l'utilisateur (rôles, permissions).</li>
+  <li>Paramètre par application <code>sso_prompt</code> (administré graphiquement) : ajoute <code>prompt=login</code> sur accès direct
+      ⇒ ressaisie des identifiants IAM ; via le portail l'accès reste fluide.</li>
+  <li>Vérification de la légitimité de l'URL de retour (même hôte que l'application) avant émission du jeton.</li>
+</ul>
+
+<h3>2.3 Portail &amp; applications</h3>
+<ul>
+  <li>Portail (page d'accueil) : grille d'applications autorisées avec icône, couleur et description ; accès en un clic (lien SSO).</li>
+  <li>Catalogage des applications : <em>code, nom, URL, redirect_uri, client_id/client_secret, active, sso_prompt, is_system</em>.</li>
+</ul>
+
+<h3>2.4 Gouvernance (RBAC) et administration graphique</h3>
+<ul>
+  <li><strong>Rôles &amp; permissions</strong> : création/édition/suppression de rôles (rôles système protégés), attribution de permissions par application.</li>
+  <li><strong>Utilisateurs</strong> : création, modification (statut, organisation, <strong>direction / service / fonction</strong>), 
+      réinitialisation de mot de passe, suppression, <strong>import CSV</strong> (modèle téléchargeable, doublons ignorés,
+      mots de passe aléatoires, rapprochement des directions insensible aux accents).</li>
+  <li><strong>Groupes</strong> : annuaires nommés (création, renommage, suppression, affectation des membres) ; multi-sélection dans les formulaires utilisateur.</li>
+  <li><strong>Organisations</strong> : arborescence Ministère/Direction/Service/Bureau avec affectation des utilisateurs.</li>
+  <li><strong>Sessions</strong> : consultation, filtrage par utilisateur, révocation individuelle ou totale.</li>
+  <li><strong>Journal d'audit</strong> : recherche textuelle et filtrage par action sur <code>audit_logs</code>.</li>
+  <li><strong>Paramètres</strong> : politique de mots de passe, durée de session et d'inactivité, <strong>paramètres API &amp; sécurité</strong> (origines CORS autorisées, géolocalisation optionnelle des IP, anti force brute par IP).</li>
+  <li><strong>E-mail &amp; MFA</strong> : configuration SMTP (Gmail/Outlook, clé applicative), envoi de test, guide pas à pas à 3 étapes.</li>
+  <li><strong>Applications</strong> : création, édition, permissions, accès utilisateurs, déploiement/retrait du garde SSO, téléchargement du garde.</li>
+  <li><strong>OAuth / OIDC</strong> : console de gestion des clients (identifiants, secret affiché une seule fois, URI de redirection,
+      grants autorisés, scopes) et <strong>rotation de la clé de signature RSA</strong> (JWKS).</li>
+</ul>
+
+<h3>2.5 API et intégration</h3>
+<ul>
+  <li>API JSON : <code>api/login.php</code>, <code>api/sso/validate.php</code>, <code>api/sso/app_config.php</code>, <code>api/userinfo.php</code>,
+      gestion des utilisateurs/rôles/permissions/applications/sessions, audit, réinitialisation de mot de passe, MFA (envoi/vérification).</li>
+  <li>Bibliothèque client <code>client/iam_client.php</code> (helper <code>iam_client_requires_prompt()</code>, etc.) et <code>client/sso_handler.php</code>.</li>
+  <li><strong>Serveur d'autorisation OAuth 2.0 / OIDC</strong> (free flow Authorization Code + PKCE) :
+    <code>oauth.php</code> (point d'autorisation + consentement), <code>api/oauth/token.php</code>
+    (authorization_code, client_credentials, refresh_token avec rotation), <code>api/oauth/userinfo.php</code>,
+    <code>api/oauth/jwks.php</code>, découverte <code>.well-known/openid-configuration.php</code> (racine et API).
+    Émission d'<code>id_token</code> signé RS256, refus journalisé (<code>access_denied</code>), PKCE par défaut.
+  </li>
+</ul>
+
+<h2>3. Diagramme de classes</h2>
+<p>Le diagramme ci-dessous modélise le schéma relationnel <code>iam_local</code> (<code>sql/schema.sql</code>) — dont les entités du volet identité,
+RBAC, sessions/SSO, MFA et audit ; s'y ajoutent depuis les derniers lots : <code>groups</code>, <code>user_groups</code>,
+<code>oauth_clients</code>, <code>oauth_codes</code>, <code>oauth_keys</code> (22 entités au total, 6 volets).</p>
+<table>
+  <tr><th>Volet</th><th>Entités</th></tr>
+  <tr><td>Identité &amp; organisation</td><td><code>organizations</code>, <code>users</code>, <code>password_history</code></td></tr>
+  <tr><td>Politique &amp; gouvernance (RBAC)</td><td><code>password_policy</code>, <code>roles</code>, <code>permissions</code>, <code>user_roles</code>, <code>role_permissions</code></td></tr>
+  <tr><td>Annuaire &amp; groupes</td><td><code>`groups`</code>, <code>user_groups</code></td></tr>
+  <tr><td>Sessions &amp; SSO</td><td><code>sessions</code>, <code>sso_tokens</code>, <code>refresh_tokens</code>, <code>remember_tokens</code></td></tr>
+  <tr><td>MFA &amp; sécurité</td><td><code>mfa_devices</code>, <code>otp_codes</code>, <code>login_attempts</code></td></tr>
+  <tr><td>OAuth 2.0 / OIDC</td><td><code>oauth_clients</code>, <code>oauth_codes</code>, <code>oauth_keys</code></td></tr>
+  <tr><td>Audit</td><td><code>audit_logs</code></td></tr>
+</table>
+<figure>
+<svg width="1500" height="760" viewBox="0 0 1500 760" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <style>
+      .clshead { fill:#eef2ff; stroke:#637381; stroke-width:1.2; }
+      .clsattr { fill:#ffffff; stroke:#637381; stroke-width:1.2; }
+      .clstitle { font-weight:700; font-size:12px; fill:#1b2030; }
+      .clstext { font-size:10px; fill:#334155; }
+      .rel { stroke:#334155; stroke-width:1.3; fill:none; }
+      .rellabel { font-size:9.5px; fill:#0f766e; font-style:italic; }
+      .mult { font-size:10px; fill:#b45309; font-weight:700; }
+      .note-box { fill:#fffbeb; stroke:#f59e0b; stroke-width:1.2; }
+      .nlb { font-size:9.5px; fill:#334155; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+  </defs>
+
+  <!-- ===== R1 (y 44) ===== -->
+  <!-- Organization (c0) -->
+  <g>
+    <rect class="clshead" x="20" y="44" width="260" height="26"/>
+    <rect class="clsattr" x="20" y="70" width="260" height="76"/>
+    <text class="clstitle" x="150" y="62" text-anchor="middle">Organization</text>
+    <text class="clstext" x="30" y="86">- name, code</text>
+    <text class="clstext" x="30" y="100">- type (ministère → bureau)</text>
+    <text class="clstext" x="30" y="114">- parent_id (auto-réf., nullable)</text>
+    <text class="clstext" x="30" y="128">- active</text>
+    <text class="clstext" x="30" y="142">- created_at, updated_at</text>
+  </g>
+  <!-- User (c1) -->
+  <g>
+    <rect class="clshead" x="320" y="44" width="260" height="26"/>
+    <rect class="clsattr" x="320" y="70" width="260" height="100"/>
+    <text class="clstitle" x="450" y="62" text-anchor="middle">User</text>
+    <text class="clstext" x="330" y="86">- email, username (UNIQUE)</text>
+    <text class="clstext" x="330" y="100">- password_hash (bcrypt)</text>
+    <text class="clstext" x="330" y="114">- status, mfa_enabled, must_change_password</text>
+    <text class="clstext" x="330" y="128">- first_name, last_name, phone, matricule</text>
+    <text class="clstext" x="330" y="142">- failed_attempts, locked_until</text>
+    <text class="clstext" x="330" y="156">- last_login_at / _ip, organization_id, created_by</text>
+  </g>
+  <!-- Role (c2) -->
+  <g>
+    <rect class="clshead" x="620" y="44" width="260" height="26"/>
+    <rect class="clsattr" x="620" y="70" width="260" height="68"/>
+    <text class="clstitle" x="750" y="62" text-anchor="middle">Role</text>
+    <text class="clstext" x="630" y="86">- name, code (UNIQUE)</text>
+    <text class="clstext" x="630" y="100">- description</text>
+    <text class="clstext" x="630" y="114">- is_system (protégé)</text>
+    <text class="clstext" x="630" y="128">- created_at</text>
+  </g>
+  <!-- Application (c3) -->
+  <g>
+    <rect class="clshead" x="920" y="44" width="260" height="26"/>
+    <rect class="clsattr" x="920" y="70" width="260" height="82"/>
+    <text class="clstitle" x="1050" y="62" text-anchor="middle">Application</text>
+    <text class="clstext" x="930" y="86">- code (UNIQUE), name</text>
+    <text class="clstext" x="930" y="100">- url, redirect_uri</text>
+    <text class="clstext" x="930" y="114">- client_id, client_secret, scopes</text>
+    <text class="clstext" x="930" y="128">- logo, color, icon</text>
+    <text class="clstext" x="930" y="142">- active, sso_prompt, is_system</text>
+  </g>
+  <!-- AuditLog (c4) -->
+  <g>
+    <rect class="clshead" x="1220" y="44" width="260" height="26"/>
+    <rect class="clsattr" x="1220" y="70" width="260" height="68"/>
+    <text class="clstitle" x="1350" y="62" text-anchor="middle">AuditLog</text>
+    <text class="clstext" x="1230" y="86">- user_id (nullable), email</text>
+    <text class="clstext" x="1230" y="100">- action, details</text>
+    <text class="clstext" x="1230" y="114">- ip_address, user_agent</text>
+    <text class="clstext" x="1230" y="128">- created_at</text>
+  </g>
+
+  <!-- ===== R2 (y 230) ===== -->
+  <!-- PasswordPolicy (c0) -->
+  <g>
+    <rect class="clshead" x="20" y="230" width="260" height="26"/>
+    <rect class="clsattr" x="20" y="256" width="260" height="68"/>
+    <text class="clstitle" x="150" y="248" text-anchor="middle">PasswordPolicy</text>
+    <text class="clstext" x="30" y="272">- min_length, 4 exigences complexité</text>
+    <text class="clstext" x="30" y="286">- history (5), expiration_days (90)</text>
+    <text class="clstext" x="30" y="300">- lockout_threshold (5) / _minutes (30)</text>
+    <text class="clstext" x="30" y="314">- session_lifetime (3600) / idle_timeout</text>
+  </g>
+  <!-- Session (c1) -->
+  <g>
+    <rect class="clshead" x="320" y="230" width="260" height="26"/>
+    <rect class="clsattr" x="320" y="256" width="260" height="68"/>
+    <text class="clstitle" x="450" y="248" text-anchor="middle">Session</text>
+    <text class="clstext" x="330" y="272">- user_id, session_token (UNIQUE)</text>
+    <text class="clstext" x="330" y="286">- ip_address, user_agent</text>
+    <text class="clstext" x="330" y="300">- expires_at, last_active_at</text>
+    <text class="clstext" x="330" y="314">- revoked (révocable)</text>
+  </g>
+  <!-- SsoToken (c3) -->
+  <g>
+    <rect class="clshead" x="920" y="230" width="260" height="26"/>
+    <rect class="clsattr" x="920" y="256" width="260" height="82"/>
+    <text class="clstitle" x="1050" y="248" text-anchor="middle">SsoToken</text>
+    <text class="clstext" x="930" y="272">- user_id, application_id</text>
+    <text class="clstext" x="930" y="286">- token (usage unique, 60 s)</text>
+    <text class="clstext" x="930" y="300">- return_url, ip_address, user_agent</text>
+    <text class="clstext" x="930" y="314">- expires_at, consumed_at</text>
+    <text class="clstext" x="930" y="328">- created_at</text>
+  </g>
+  <!-- OtpCode (c4) -->
+  <g>
+    <rect class="clshead" x="1220" y="230" width="260" height="26"/>
+    <rect class="clsattr" x="1220" y="256" width="260" height="54"/>
+    <text class="clstitle" x="1350" y="248" text-anchor="middle">OtpCode</text>
+    <text class="clstext" x="1230" y="272">- user_id, code_hash</text>
+    <text class="clstext" x="1230" y="286">- method (email/sms/totp)</text>
+    <text class="clstext" x="1230" y="300">- expires_at (5 min), used</text>
+  </g>
+
+  <!-- ===== R3 (y 416) ===== -->
+  <!-- LoginAttempt (c0) -->
+  <g>
+    <rect class="clshead" x="20" y="416" width="260" height="26"/>
+    <rect class="clsattr" x="20" y="442" width="260" height="54"/>
+    <text class="clstitle" x="150" y="434" text-anchor="middle">LoginAttempt</text>
+    <text class="clstext" x="30" y="458">- identifier, ip_address</text>
+    <text class="clstext" x="30" y="472">- user_agent, success</text>
+  </g>
+  <!-- MfaDevice (c1) -->
+  <g>
+    <rect class="clshead" x="320" y="416" width="260" height="26"/>
+    <rect class="clsattr" x="320" y="442" width="260" height="54"/>
+    <text class="clstitle" x="450" y="434" text-anchor="middle">MfaDevice</text>
+    <text class="clstext" x="330" y="458">- user_id, method</text>
+    <text class="clstext" x="330" y="472">- secret, destination</text>
+    <text class="clstext" x="330" y="486">- confirmed_at</text>
+  </g>
+  <!-- RefreshToken (c2) -->
+  <g>
+    <rect class="clshead" x="620" y="416" width="260" height="26"/>
+    <rect class="clsattr" x="620" y="442" width="260" height="54"/>
+    <text class="clstitle" x="750" y="434" text-anchor="middle">RefreshToken</text>
+    <text class="clstext" x="630" y="458">- user_id, token (UNIQUE)</text>
+    <text class="clstext" x="630" y="472">- expires_at, revoked</text>
+  </g>
+  <!-- RememberToken (c4) -->
+  <g>
+    <rect class="clshead" x="1220" y="416" width="260" height="26"/>
+    <rect class="clsattr" x="1220" y="442" width="260" height="54"/>
+    <text class="clstitle" x="1350" y="434" text-anchor="middle">RememberToken</text>
+    <text class="clstext" x="1230" y="458">- user_id, token_hash</text>
+    <text class="clstext" x="1230" y="472">- expires_at</text>
+  </g>
+
+  <!-- ===== R4 (y 602) ===== -->
+  <!-- PasswordHistory (c0) -->
+  <g>
+    <rect class="clshead" x="20" y="602" width="260" height="26"/>
+    <rect class="clsattr" x="20" y="628" width="260" height="40"/>
+    <text class="clstitle" x="150" y="620" text-anchor="middle">PasswordHistory</text>
+    <text class="clstext" x="30" y="650">- user_id, password_hash, created_at</text>
+  </g>
+  <!-- UserRole (c1) - jonction -->
+  <g>
+    <rect class="clshead" x="320" y="602" width="260" height="26"/>
+    <rect class="clsattr" x="320" y="628" width="260" height="54"/>
+    <text class="clstitle" x="450" y="620" text-anchor="middle">« junction » UserRole</text>
+    <text class="clstext" x="330" y="650">- user_id, role_id, application_id</text>
+    <text class="clstext" x="330" y="666">- UNIQUE (user, role, application)</text>
+  </g>
+  <!-- Permission (c3) -->
+  <g>
+    <rect class="clshead" x="920" y="602" width="260" height="26"/>
+    <rect class="clsattr" x="920" y="628" width="260" height="54"/>
+    <text class="clstitle" x="1050" y="620" text-anchor="middle">Permission</text>
+    <text class="clstext" x="930" y="650">- application_id (nullable)</text>
+    <text class="clstext" x="930" y="666">- name, code (UNIQUE), description</text>
+  </g>
+  <!-- RolePermission (c4) - jonction -->
+  <g>
+    <rect class="clshead" x="1220" y="602" width="260" height="26"/>
+    <rect class="clsattr" x="1220" y="628" width="260" height="40"/>
+    <text class="clstitle" x="1350" y="620" text-anchor="middle">« junction » RolePermission</text>
+    <text class="clstext" x="1230" y="650">- role_id, permission_id (PK composite)</text>
+  </g>
+
+  <!-- ===== Associations ===== -->
+  <!-- r1 : Organization -> User -->
+  <line class="rel" x1="280" y1="120" x2="320" y2="120"/>
+  <text class="mult" x="286" y="114">1</text>
+  <text class="mult" x="300" y="114">0..1</text>
+  <text class="rellabel" x="286" y="132">appartient à</text>
+  <!-- org auto-référence -->
+  <path class="rel" d="M 150 146 C 150 180 230 180 230 146"/>
+  <text class="rellabel" x="170" y="176">parent (hiérarchie)</text>
+
+  <!-- r2 : User -> Session -->
+  <line class="rel" x1="450" y1="170" x2="450" y2="230"/>
+  <text class="mult" x="440" y="182">1</text>
+  <text class="mult" x="456" y="222">0..*</text>
+  <!-- r3 : User -> MfaDevice -->
+  <path class="rel" d="M 580 150 L 610 150 L 610 468 L 580 468"/>
+  <text class="mult" x="612" y="146">1</text>
+  <text class="mult" x="614" y="484">0..*</text>
+  <!-- r4 : User -> OtpCode -->
+  <path class="rel" d="M 430 170 L 430 184 L 1320 184 L 1320 230"/>
+  <text class="mult" x="424" y="180">1</text>
+  <text class="mult" x="1324" y="226">0..*</text>
+  <!-- r5 : User -> SsoToken -->
+  <path class="rel" d="M 460 170 L 460 190 L 970 190 L 970 230"/>
+  <text class="mult" x="452" y="180">1</text>
+  <text class="mult" x="976" y="226">0..*</text>
+  <!-- r6 : Application -> SsoToken -->
+  <line class="rel" x1="1100" y1="152" x2="1100" y2="230"/>
+  <text class="mult" x="1089" y="186">1</text>
+  <text class="mult" x="1108" y="226">0..*</text>
+  <!-- r7 : User -> RefreshToken -->
+  <path class="rel" d="M 470 170 L 470 202 L 750 202 L 750 416"/>
+  <text class="mult" x="462" y="198">1</text>
+  <text class="mult" x="756" y="410">0..*</text>
+  <!-- r8 : User -> LoginAttempt -->
+  <path class="rel" d="M 400 170 L 400 210 L 302 210 L 302 460 L 280 460"/>
+  <text class="mult" x="392" y="206">1</text>
+  <text class="mult" x="286" y="466">0..*</text>
+  <text class="rellabel" x="40" y="500">lié par identifiant, sans FK</text>
+  <!-- r9 : User -> RememberToken -->
+  <path class="rel" d="M 510 44 L 510 24 L 1490 24 L 1490 452 L 1480 452"/>
+  <text class="mult" x="514" y="18">1</text>
+  <text class="mult" x="1482" y="442">0..*</text>
+  <!-- r10 : User -> AuditLog -->
+  <path class="rel" d="M 480 170 L 480 216 L 1350 216 L 1350 138"/>
+  <text class="mult" x="472" y="212">1</text>
+  <text class="mult" x="1354" y="152">0..*</text>
+  <!-- r11 : User -> PasswordHistory -->
+  <path class="rel" d="M 420 170 L 420 178 L 294 178 L 294 630 L 280 630"/>
+  <text class="mult" x="412" y="174">1</text>
+  <text class="mult" x="300" y="638">0..*</text>
+  <!-- r12 : User -> UserRole -->
+  <path class="rel" d="M 580 120 L 600 120 L 600 640 L 580 640"/>
+  <text class="mult" x="586" y="112">1</text>
+  <text class="mult" x="606" y="652">0..*</text>
+  <!-- r13 : UserRole -> Application -->
+  <path class="rel" d="M 450 602 L 450 585 L 900 585 L 900 165 L 945 165 L 945 152"/>
+  <text class="mult" x="456" y="592">0..*</text>
+  <text class="mult" x="952" y="172">1</text>
+  <!-- r14 : UserRole -> Role -->
+  <path class="rel" d="M 500 602 L 500 576 L 618 576 L 618 138 L 620 138"/>
+  <text class="mult" x="492" y="588">0..*</text>
+  <text class="mult" x="596" y="132">1</text>
+  <!-- r15 : Role -> RolePermission -->
+  <path class="rel" d="M 750 138 L 750 192 L 1490 192 L 1490 635 L 1480 635"/>
+  <text class="mult" x="742" y="148">0..*</text>
+  <text class="mult" x="1482" y="628">1</text>
+  <!-- r16 : RolePermission -> Permission -->
+  <line class="rel" x1="1220" y1="630" x2="1180" y2="630"/>
+  <text class="mult" x="1212" y="624">0..*</text>
+  <text class="mult" x="1184" y="624">1</text>
+  <!-- r17 : Application -> Permission -->
+  <path class="rel" d="M 1180 120 L 1200 120 L 1200 640 L 1180 640"/>
+  <text class="mult" x="1206" y="114">1</text>
+  <text class="mult" x="1170" y="650">0..*</text>
+
+  <!-- ===== Légende / notes ===== -->
+  <rect class="note-box" x="20" y="702" width="1460" height="46" rx="6"/>
+  <text class="nlb" x="34" y="721">Légende des cardinalités : « 1 » = exactement un · « 0..1 » = zéro ou un · « 0..* » = zéro ou plusieurs.</text>
+  <text class="nlb" x="34" y="737">Notes : les jonctions UserRole (utilisateur ✓ rôle ✓ application) et RolePermission (rôle ✓ permission) résolvent les N..N.
+  LoginAttempt est lié par identifiant (aucune clé étrangère) ; users.created_by est une auto-référence à users.id ; password_policy est une configuration unique (1 ligne).</text>
+</svg>
+</figure>
+
+<h3>3.1 Récapitulatif des associations</h3>
+<table>
+  <tr><th>Association</th><th>Source</th><th>Cible</th><th>Cardinalité</th><th>Commentaire</th></tr>
+  <tr><td>Organization → User</td><td>organizations</td><td>users</td><td>1 — 0..1</td><td>organization_id nullable (ON DELETE SET NULL)</td></tr>
+  <tr><td>Organization → Organization</td><td>parent_id</td><td>—</td><td>0..1 — 0..*</td><td>auto-référence hiérarchique Ministère → Bureau</td></tr>
+  <tr><td>User → Session / RefreshToken / RememberToken</td><td>users</td><td>sessions · refresh_tokens · remember_tokens</td><td>1 — 0..*</td><td>suppression en cascade (ON DELETE CASCADE)</td></tr>
+  <tr><td>User → MfaDevice / OtpCode</td><td>users</td><td>mfa_devices · otp_codes</td><td>1 — 0..*</td><td>MFA : dispositifs enregistrés + codes OTP en attente</td></tr>
+  <tr><td>User → LoginAttempt</td><td>users (par identifiant)</td><td>login_attempts</td><td>1 — 0..*</td><td>anti force brute, journal de tentatives (sans FK)</td></tr>
+  <tr><td>User → PasswordHistory</td><td>users</td><td>password_history</td><td>1 — 0..*</td><td>historique anti-réutilisation (history = 5)</td></tr>
+  <tr><td>User → AuditLog</td><td>users</td><td>audit_logs</td><td>1 — 0..*</td><td>user_id nullable (ON DELETE SET NULL)</td></tr>
+  <tr><td>User → Application</td><td>users ⇄ applications</td><td>user_roles</td><td>0..* — 0..*</td><td>N..N à 3 clés : un rôle par utilisateur et par application</td></tr>
+  <tr><td>Role → Permission</td><td>roles ⇄ permissions</td><td>role_permissions</td><td>0..* — 0..*</td><td>N..N résolu par table de jonction</td></tr>
+  <tr><td>Application → Permission</td><td>applications</td><td>permissions</td><td>1 — 0..*</td><td>permissions par application (nullable)</td></tr>
+  <tr><td>Application → SsoToken</td><td>applications</td><td>sso_tokens</td><td>1 — 0..*</td><td>jeton SSO à usage unique (60 s)</td></tr>
+</table>
+
+<h2>4. Diagrammes d'activité</h2>
+<p>Deux diagrammes d'activité (UML) décrivent les flux critiques : <strong>4.1</strong> le flux SSO de bout en bout
+(portail → application → IAM) et <strong>4.2</strong> la phase d'authentification avec MFA par e-mail et changement de mot de passe.
+Les pointillés représentent le retour d'une branche forcée (re-contrôle dans <code>authorize.php</code>).</p>
+
+<div class="activity-page">
+<h3>4.1 Flux SSO de bout en bout</h3>
+<p>L'utilisateur accède à une application protégée par le garde <code>iam-sso-&lt;code&gt;.php</code> (chargé via
+<code>auto_prepend_file</code>). Si la session locale de l'application est absente, <code>sso/authorize.php</code> contrôle la session IAM,
+le MFA, le mot de passe et l'accès RBAC, puis émet un jeton à usage unique validé par <code>api/sso/validate.php</code>.</p>
+<figure>
+<svg width="1200" height="1080" viewBox="0 0 1200 1080" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <style>
+      .lane { fill:#f8fafc; }
+      .lane2 { fill:#eef2ff; }
+      .lane3 { fill:#f0fdf4; }
+      .lanename { font-weight:700; font-size:13px; fill:#1b2030; }
+      .act { fill:#ffffff; stroke:#475569; stroke-width:1.3; }
+      .act2 { fill:#eff6ff; stroke:#4361ee; stroke-width:1.3; }
+      .dec { fill:#fefce8; stroke:#d97706; stroke-width:1.3; }
+      .fin { fill:#1b2030; stroke:#1b2030; }
+      .txt { font-size:11px; fill:#212529; }
+      .lbl { font-size:10px; fill:#0f766e; font-style:italic; }
+      .arr { stroke:#334155; stroke-width:1.4; fill:none; marker-end:url(#arrow); }
+      .arrm { stroke:#16a34a; stroke-width:1.3; fill:none; stroke-dasharray:6 4; marker-end:url(#arrowd); }
+      .start { fill:#1b2030; }
+      .red { fill:#fff1f2; stroke:#b91c1c; stroke-width:1.3; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <!-- ===== Pistages ===== -->
+  <rect class="lane"  x="20"  y="20" width="280" height="1010"/>
+  <rect class="lane2" x="300" y="20" width="300" height="1010"/>
+  <rect class="lane3" x="620" y="20" width="565" height="1010"/>
+  <text class="lanename" x="160" y="42" text-anchor="middle">Utilisateur</text>
+  <text class="lanename" x="450" y="42" text-anchor="middle">Application (garde iam-sso-*.php)</text>
+  <text class="lanename" x="900" y="42" text-anchor="middle">IAM-Local</text>
+
+  <!-- ===== Nœud initial ===== -->
+  <ellipse class="start" cx="160" cy="52" rx="7" ry="7"/>
+
+  <!-- U1 : ouverture -->
+  <rect class="act" x="50" y="70" width="240" height="46" rx="9"/>
+  <text class="txt" x="170" y="93" text-anchor="middle">L'utilisateur ouvre l'application</text>
+  <text class="txt" x="170" y="108" text-anchor="middle">(portail ou lien direct)</text>
+
+  <!-- A1 : garde -->
+  <rect class="act2" x="330" y="84" width="240" height="46" rx="9"/>
+  <text class="txt" x="450" y="107" text-anchor="middle">Garde iam-sso-&lt;code&gt;.php</text>
+  <text class="txt" x="450" y="122" text-anchor="middle">(auto_prepend) — session locale ?</text>
+
+  <!-- D1 : session applicative -->
+  <polygon class="dec" points="450,148 545,200 450,252 355,200"/>
+  <text class="txt" x="450" y="196" text-anchor="middle">Session applicative</text>
+  <text class="txt" x="450" y="210" text-anchor="middle">authentifiée ?</text>
+
+  <!-- E1 : accès direct -->
+  <rect class="act" x="350" y="300" width="210" height="40" rx="9"/>
+  <text class="txt" x="455" y="325" text-anchor="middle">Afficher la page demandée</text>
+  <circle class="fin" cx="455" cy="364" r="7"/>
+
+  <!-- A2 : redirection -->
+  <rect class="act2" x="340" y="430" width="250" height="40" rx="9"/>
+  <text class="txt" x="465" y="452" text-anchor="middle">Redirection HTTP : /sso/authorize.php</text>
+  <text class="txt" x="465" y="465" text-anchor="middle">?app=…&amp;return=…[&amp;prompt=login]</text>
+
+  <!-- IAM : I1 contrôle -->
+  <rect class="act" x="645" y="120" width="330" height="44" rx="9"/>
+  <text class="txt" x="810" y="136" text-anchor="middle">authorize.php — vérifier :</text>
+  <text class="txt" x="810" y="150" text-anchor="middle">application active + URL de retour légitime</text>
+
+  <!-- D2 -->
+  <polygon class="dec" points="810,198 910,250 810,302 710,250"/>
+  <text class="txt" x="810" y="246" text-anchor="middle">Session IAM valide</text>
+  <text class="txt" x="810" y="260" text-anchor="middle">et accès fluide ?</text>
+
+  <!-- D3 -->
+  <polygon class="dec" points="810,340 910,392 810,444 710,392"/>
+  <text class="txt" x="810" y="388" text-anchor="middle">MFA vérifié ?</text>
+
+  <!-- D4 -->
+  <polygon class="dec" points="810,458 910,510 810,562 710,510"/>
+  <text class="txt" x="810" y="498" text-anchor="middle">Mot de passe expiré</text>
+  <text class="txt" x="810" y="514" text-anchor="middle">ou à changer ?</text>
+
+  <!-- D5 -->
+  <polygon class="dec" points="810,578 910,630 810,682 710,630"/>
+  <text class="txt" x="810" y="626" text-anchor="middle">Accès RBAC : rôle</text>
+  <text class="txt" x="810" y="640" text-anchor="middle">sur l'app ou admin ?</text>
+
+  <!-- I2 : jeton -->
+  <rect class="act" x="645" y="700" width="330" height="44" rx="9"/>
+  <text class="txt" x="810" y="716" text-anchor="middle">Créer jeton sso_tokens</text>
+  <text class="txt" x="810" y="730" text-anchor="middle">(60 s, usage unique) + audit</text>
+
+  <!-- I3 : redirection -->
+  <rect class="act" x="645" y="770" width="330" height="44" rx="9"/>
+  <text class="txt" x="810" y="796" text-anchor="middle">Redirection : ?return=…&amp;sso_token=…</text>
+
+  <!-- G4 : validation -->
+  <rect class="act" x="645" y="840" width="330" height="44" rx="9"/>
+  <text class="txt" x="810" y="856" text-anchor="middle">validate.php : consomme le jeton,</text>
+  <text class="txt" x="810" y="870" text-anchor="middle">vérifie app + utilisateur actif</text>
+
+  <!-- D6 -->
+  <polygon class="dec" points="810,898 910,950 810,1002 710,950"/>
+  <text class="txt" x="810" y="946" text-anchor="middle">Jeton valide ?</text>
+
+  <!-- Colonne droite IAM : interactions forcées -->
+  <rect class="red" x="1000" y="110" width="185" height="40" rx="8"/>
+  <text class="txt" x="1092" y="127" text-anchor="middle">404 — app inconnue</text>
+  <text class="txt" x="1092" y="141" text-anchor="middle">ou URL invalide</text>
+
+  <rect class="act" x="1000" y="330" width="185" height="46" rx="8"/>
+  <text class="txt" x="1092" y="354" text-anchor="middle">mfa.php : saisir le</text>
+  <text class="txt" x="1092" y="368" text-anchor="middle">code OTP (6 chiffres)</text>
+
+  <rect class="act" x="1000" y="455" width="185" height="44" rx="8"/>
+  <text class="txt" x="1092" y="479" text-anchor="middle">profile.php?force=1 :</text>
+  <text class="txt" x="1092" y="493" text-anchor="middle">nouveau mot de passe</text>
+
+  <rect class="act" x="1000" y="515" width="185" height="46" rx="8"/>
+  <text class="txt" x="1092" y="539" text-anchor="middle">login.php : validation</text>
+  <text class="txt" x="1092" y="553" text-anchor="middle">(bcrypt, statut, verrouillage)</text>
+
+  <rect class="red" x="1000" y="600" width="185" height="40" rx="8"/>
+  <text class="txt" x="1092" y="617" text-anchor="middle">403 — accès refusé</text>
+  <text class="txt" x="1092" y="631" text-anchor="middle">(contacter l'admin)</text>
+
+  <rect class="red" x="1000" y="928" width="185" height="46" rx="8"/>
+  <text class="txt" x="1092" y="952" text-anchor="middle">401 — jeton invalide,</text>
+  <text class="txt" x="1092" y="966" text-anchor="middle">expiré ou consommé</text>
+
+  <!-- Utilisateur : écran de connexion -->
+  <rect class="act" x="50" y="340" width="240" height="54" rx="9"/>
+  <text class="txt" x="170" y="366" text-anchor="middle">Écran de connexion IAM :</text>
+  <text class="txt" x="170" y="380" text-anchor="middle">e-mail + mot de passe</text>
+
+  <!-- ===== Flèches (flux principal) ===== -->
+  <line class="arr" x1="160" y1="59" x2="160" y2="70"/>
+  <path class="arr" d="M 170 116 L 170 130 L 330 130 L 330 107"/>
+  <line class="arr" x1="450" y1="130" x2="450" y2="148"/>
+  <path class="arr" d="M 355 200 L 338 200 L 338 320 L 350 320"/>
+  <text class="lbl" x="330" y="212">oui</text>
+  <path class="arr" d="M 545 200 L 600 200 L 600 450 L 590 450"/>
+  <text class="lbl" x="556" y="215">non</text>
+  <path class="arr" d="M 590 470 L 625 470 L 625 142 L 645 142"/>
+  <line class="arr" x1="810" y1="164" x2="810" y2="198"/>
+  <line class="arr" x1="975" y1="130" x2="1000" y2="130"/>
+  <text class="lbl" x="978" y="126">inactive</text>
+  <line class="arr" x1="810" y1="302" x2="810" y2="340"/>
+  <text class="lbl" x="818" y="318">oui</text>
+  <path class="arr" d="M 710 250 L 710 262 L 295 262 L 295 367 L 290 367"/>
+  <text class="lbl" x="330" y="274">non (se connecter)</text>
+  <line class="arr" x1="810" y1="444" x2="810" y2="458"/>
+  <text class="lbl" x="818" y="452">oui</text>
+  <path class="arr" d="M 910 392 L 970 392 L 970 353 L 1000 353"/>
+  <text class="lbl" x="932" y="388">non</text>
+  <line class="arr" x1="810" y1="562" x2="810" y2="578"/>
+  <text class="lbl" x="818" y="568">non</text>
+  <path class="arr" d="M 910 510 L 950 510 L 950 477 L 1000 477"/>
+  <text class="lbl" x="924" y="504">oui (expiré)</text>
+  <line class="arr" x1="810" y1="682" x2="810" y2="700"/>
+  <text class="lbl" x="818" y="690">oui</text>
+  <path class="arr" d="M 910 630 L 1000 630"/>
+  <text class="lbl" x="930" y="642">non</text>
+  <line class="arr" x1="810" y1="744" x2="810" y2="770"/>
+  <path class="arr" d="M 645 792 L 640 792 L 640 752 L 570 752"/>
+  <path class="arr" d="M 440 774 L 440 820 L 810 820 L 810 840"/>
+  <line class="arr" x1="810" y1="884" x2="810" y2="898"/>
+  <path class="arr" d="M 710 950 L 620 950 L 620 951 L 570 951"/>
+  <text class="lbl" x="660" y="964">oui</text>
+  <line class="arr" x1="910" y1="950" x2="1000" y2="950"/>
+  <text class="lbl" x="930" y="962">non</text>
+  <line class="arr" x1="445" y1="972" x2="445" y2="985"/>
+  <line class="arr" x1="445" y1="1027" x2="445" y2="1033"/>
+  <line class="arr" x1="455" y1="340" x2="455" y2="357"/>
+
+  <!-- ===== Flèches en pointillés (retours) ===== -->
+  <path class="arrm" d="M 170 394 L 170 570 L 1000 570 L 1000 537"/>
+  <text class="lbl" x="330" y="566">soumission</text>
+  <path class="arrm" d="M 1185 538 L 1198 538 L 1198 10 L 878 10 L 878 120"/>
+  <path class="arrm" d="M 1185 353 L 1196 353 L 1196 18 L 858 18 L 858 120"/>
+  <path class="arrm" d="M 1185 477 L 1194 477 L 1194 26 L 888 26 L 888 120"/>
+  <text class="lbl" x="950" y="38" text-anchor="middle">retour : re-contrôle dans authorize.php</text>
+</svg>
+</figure>
+<p class="note">Le chemin en pointillés ramène l'utilisateur vers <code>authorize.php</code> après une action forcée
+(login, MFA, changement de mot de passe) : les contrôles sont renouvelés, puis un jeton
+<code>sso_tokens</code> est émis et validé par la garde auprès de <code>api/sso/validate.php</code>
+(la branche « oui » de D1 devient active pour les accès suivants).</p>
+</div>
+
+<div class="activity-page activity-page--portrait">
+<h3>4.2 Authentification, MFA par e-mail et changement de mot de passe</h3>
+<p>Flux interne de <code>login.php</code> puis <code>mfa.php</code> : anti force brute (5 échecs → verrouillage 30 min),
+code OTP à 6 chiffres (5 minutes, 5 essais, envoi SMTP), puis bascule obligatoire vers
+<code>profile.php?force=1</code> si <code>must_change_password</code> ou expiration atteinte.</p>
+<figure>
+<svg width="900" height="1140" viewBox="0 0 900 1140" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <style>
+      .lane { fill:#f8fafc; }
+      .lane3 { fill:#f0fdf4; }
+      .lanename { font-weight:700; font-size:13px; fill:#1b2030; }
+      .act { fill:#ffffff; stroke:#475569; stroke-width:1.3; }
+      .act2 { fill:#eff6ff; stroke:#4361ee; stroke-width:1.3; }
+      .dec { fill:#fefce8; stroke:#d97706; stroke-width:1.3; }
+      .fin { fill:#1b2030; stroke:#1b2030; }
+      .txt { font-size:11px; fill:#212529; }
+      .lbl { font-size:10px; fill:#0f766e; font-style:italic; }
+      .arr { stroke:#334155; stroke-width:1.4; fill:none; marker-end:url(#arrow); }
+      .arrm { stroke:#16a34a; stroke-width:1.3; fill:none; stroke-dasharray:6 4; marker-end:url(#arrowd); }
+      .start { fill:#1b2030; }
+      .red { fill:#fff1f2; stroke:#b91c1c; stroke-width:1.3; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <!-- ===== Pistages ===== -->
+  <rect class="lane"  x="20"  y="20" width="360" height="1070"/>
+  <rect class="lane3" x="400" y="20" width="480" height="1070"/>
+  <text class="lanename" x="200" y="42" text-anchor="middle">Utilisateur</text>
+  <text class="lanename" x="640" y="42" text-anchor="middle">IAM-Local</text>
+
+  <!-- ===== Nœud initial ===== -->
+  <ellipse class="start" cx="160" cy="52" rx="7" ry="7"/>
+
+  <!-- U1 -->
+  <rect class="act" x="40" y="100" width="240" height="40" rx="9"/>
+  <text class="txt" x="160" y="125" text-anchor="middle">Saisir e-mail et mot de passe</text>
+
+  <!-- IAM : A1 -->
+  <rect class="act" x="400" y="100" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="117" text-anchor="middle">login.php : valider l'identifiant</text>
+  <text class="txt" x="560" y="131" text-anchor="middle">(CSRF, statut, anti force brute)</text>
+
+  <!-- D1 -->
+  <polygon class="dec" points="560,160 650,208 560,256 470,208"/>
+  <text class="txt" x="560" y="204" text-anchor="middle">Identifiant valide</text>
+  <text class="txt" x="560" y="218" text-anchor="middle">et non verrouillé ?</text>
+
+  <!-- A2 -->
+  <rect class="act" x="400" y="296" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="313" text-anchor="middle">Vérifier mot de passe (bcrypt)</text>
+  <text class="txt" x="560" y="327" text-anchor="middle">et compteur de tentatives</text>
+
+  <!-- D2 -->
+  <polygon class="dec" points="560,356 650,404 560,452 470,404"/>
+  <text class="txt" x="560" y="400" text-anchor="middle">Mot de passe valide ?</text>
+
+  <!-- A3 -->
+  <rect class="act" x="400" y="492" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="509" text-anchor="middle">Session IAM + reset échecs</text>
+  <text class="txt" x="560" y="523" text-anchor="middle">+ journal login_success</text>
+
+  <!-- D3 -->
+  <polygon class="dec" points="560,552 650,600 560,648 470,600"/>
+  <text class="txt" x="560" y="596" text-anchor="middle">MFA e-mail requis ?</text>
+
+  <!-- M1 -->
+  <rect class="act" x="720" y="790" width="240" height="44" rx="9"/>
+  <text class="txt" x="840" y="807" text-anchor="middle">mfa.php : OTP 6 chiffres</text>
+  <text class="txt" x="840" y="821" text-anchor="middle">→ e-mail (SMTP), 5 min</text>
+
+  <!-- U2 -->
+  <rect class="act" x="40" y="700" width="240" height="44" rx="9"/>
+  <text class="txt" x="160" y="725" text-anchor="middle">Lire le code OTP et le saisir</text>
+
+  <!-- D4 -->
+  <polygon class="dec" points="560,712 650,760 560,808 470,760"/>
+  <text class="txt" x="560" y="755" text-anchor="middle">Code OTP correct ?</text>
+  <text class="txt" x="560" y="769" text-anchor="middle">(≤ 5 essais)</text>
+
+  <!-- A4 -->
+  <rect class="act" x="400" y="868" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="885" text-anchor="middle">mfa_verified = true</text>
+  <text class="txt" x="560" y="899" text-anchor="middle">+ audit mfa_verify</text>
+
+  <!-- A5 -->
+  <rect class="act" x="400" y="948" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="965" text-anchor="middle">Si must_change / expiré :</text>
+  <text class="txt" x="560" y="979" text-anchor="middle">profile.php?force=1</text>
+
+  <!-- E1 -->
+  <rect class="act" x="400" y="1040" width="320" height="40" rx="9"/>
+  <text class="txt" x="560" y="1065" text-anchor="middle">Accès : portail / application</text>
+  <circle class="fin" cx="560" cy="1108" r="7"/>
+
+  <!-- Erreurs -->
+  <rect class="red" x="740" y="188" width="140" height="36" rx="8"/>
+  <text class="txt" x="810" y="205" text-anchor="middle">Identifiants</text>
+  <text class="txt" x="810" y="219" text-anchor="middle">incorrects / verrouillé</text>
+  <rect class="red" x="740" y="388" width="140" height="36" rx="8"/>
+  <text class="txt" x="810" y="405" text-anchor="middle">Échec n° i —</text>
+  <text class="txt" x="810" y="419" text-anchor="middle">verrouillage ≥ 5</text>
+  <rect class="red" x="740" y="744" width="140" height="36" rx="8"/>
+  <text class="txt" x="810" y="761" text-anchor="middle">Code invalide /</text>
+  <text class="txt" x="810" y="775" text-anchor="middle">expiré</text>
+
+  <!-- ===== Flèches ===== -->
+  <line class="arr" x1="160" y1="59" x2="160" y2="100"/>
+  <line class="arr" x1="280" y1="120" x2="400" y2="120"/>
+  <line class="arr" x1="560" y1="140" x2="560" y2="160"/>
+  <path class="arr" d="M 650 208 L 740 208"/>
+  <path class="arrm" d="M 810 188 L 810 150 L 270 150 L 270 140"/>
+  <line class="arr" x1="560" y1="256" x2="560" y2="296"/>
+  <text class="lbl" x="568" y="274">oui</text>
+  <path class="arr" d="M 650 404 L 740 404"/>
+  <text class="lbl" x="670" y="420">non</text>
+  <path class="arrm" d="M 810 388 L 810 156 L 250 156 L 250 140"/>
+  <text class="lbl" x="500" y="150">réessayer</text>
+  <line class="arr" x1="560" y1="452" x2="560" y2="492"/>
+  <text class="lbl" x="568" y="470">oui</text>
+  <line class="arr" x1="560" y1="532" x2="560" y2="552"/>
+  <path class="arr" d="M 650 600 L 700 600 L 700 722 L 720 722"/>
+  <text class="lbl" x="668" y="614">oui</text>
+  <path class="arrm" d="M 470 600 L 300 600 L 300 920 L 420 920 L 420 908"/>
+  <text class="lbl" x="336" y="640">non (MFA requis = false)</text>
+  <path class="arr" d="M 720 812 L 690 812 L 690 700 L 300 700 L 300 722 L 280 722"/>
+  <text class="lbl" x="470" y="690">envoi du code</text>
+  <path class="arr" d="M 160 744 L 160 796 L 470 796 L 470 760"/>
+  <path class="arr" d="M 650 760 L 740 760"/>
+  <text class="lbl" x="670" y="732">non</text>
+  <path class="arrm" d="M 880 762 L 884 762 L 884 660 L 30 660 L 30 722 L 40 722"/>
+  <text class="lbl" x="560" y="654">réessayer (nouveau code)</text>
+  <line class="arr" x1="560" y1="808" x2="560" y2="868"/>
+  <text class="lbl" x="568" y="838">oui</text>
+  <line class="arr" x1="560" y1="908" x2="560" y2="948"/>
+  <line class="arr" x1="560" y1="988" x2="560" y2="1040"/>
+  <line class="arr" x1="560" y1="1080" x2="560" y2="1101"/>
+</svg>
+</figure>
+<p class="note">Les boucles en pointillés relancent la saisie ; le « non » après la validation du mot de passe revient à l'écran de connexion.
+Un nouvel échec incrémente <code>login_attempts</code> ; dès le seuil de 5, le compte est verrouillé 30 minutes
+(<code>locked_until</code>). Une fois MFA vérifié et mot de passe à jour, l'accès est transmis au portail ou, via le +SSO, au retour de
+<code>authorize.php</code>.</p>
+</div>
+
+<h2>5. Architecture technique et sécurité</h2>
+<h3>5.1 Pile technique</h3>
+<table>
+  <tr><th>Composant</th><th>Choix</th></tr>
+  <tr><td>Langage</td><td>PHP natif (aucun framework), PHP 8.x</td></tr>
+  <tr><td>Base de données</td><td>MySQL 8 (PDo), base <code>iam_local</code>, caractère utf8mb4</td></tr>
+  <tr><td>Sessions</td><td>Sessions PHP (cookie <code>iam_session</code>), régénération d'ID, HttpOnly, Strict Mode</td></tr>
+  <tr><td>Mots de passe</td><td>bcrypt (<code>password_hash</code>), historique anti-réutilisation, expiration configurable</td></tr>
+  <tr><td>MFA</td><td>OTP par e-mail (SMTP : Gmail/Outlook, clé applicative) ; affichage en mode démonstration si SMTP non configuré</td></tr>
+  <tr><td>Jeton SSO</td><td>Jeton aléatoire à usage unique (<code>sso_tokens</code>), durée de vie 60 s, consommé après usage</td></tr>
+  <tr><td>OAuth 2.0 / OIDC</td><td>Clé de signature RSA 2048 (RS256) auto-générée (<code>oauth_keys</code>), exposition JWKS, id_token signé, refresh tokens rotatifs</td></tr>
+  <tr><td>Connexion OTP</td><td>Code à usage unique sur e-mail ou téléphone (<code>otp_login.php</code>), verrouillage après échecs répétés</td></tr>
+</table>
+<h3>5.2 Mesures de sécurité</h3>
+<ul>
+  <li>Anti force brute positionnable (verrouillage après 5 échecs / 30 min), journalisé.</li>
+  <li>Anti force brute <strong>par adresse IP</strong> sur les pages et API de connexion : 60 échecs / 15 min (paramétrable en constantes).</li>
+  <li>Origines CORS d'accès à l'API paramétrables (<code>settings.cors_origins</code>, défaut <code>*</code>).</li>
+  <li>Géolocalisation optionnelle des adresses IP publiques dans l'audit (service ip-api.com, sans stockage ; IP locales = « Réseau local »).</li>
+  <li>Protection CSRF sur toutes les actions d'administration (jeton de session).</li>
+  <li>Échappement HTML systématique (<code>htmlspecialchars</code>) sur les saisies restituées.</li>
+  <li>Vérification de l'hôte dans l'URL de retour SSO (anti redirection ouverte).</li>
+  <li>CURL côté application : vérification SSL activée (<code>CURLOPT_SSL_VERIFYPEER</code>).</li>
+  <li>Journal d'audit horodaté : connexions, MFA, SSO, admin (création, suppression, droits…).</li>
+  <li>Rôles système non supprimables, applications système non supprimables.</li>
+  <li>OAuth 2.0 : validation stricte de la redirection (anti redirection ouverte), PKCE S256 (ou plain) comparé via <code>hash_equals</code>,
+      codes d'autorisation à usage unique, rotation des refresh tokens (l'ancien est révoqué), scopes sur liste blanche, clé signée RS256 + rotation.</li>
+</ul>
+
+<h2>6. Environnement et exigences</h2>
+<table>
+  <tr><th>Poste</th><th>Exigence</th></tr>
+  <tr><td>Serveur</td><td>WAMP (Apache + PHP 8 + MySQL 8), racine <code>C:\wamp64\www</code></td></tr>
+  <tr><td>Base</td><td><code>iam_local</code> — schéma fourni (<code>sql/schema.sql</code>), installateur web <code>install.php</code></td></tr>
+  <tr><td>Applications intégrées (SSO)</td><td>Gestion de présence (<code>GestionPresnceAdenIAM</code>), Gestion de salaire (<code>GestionSalaireAden</code>), EduCongo2, etc. — garde déployé par l'admin</td></tr>
+  <tr><td>Mots de passe de démonstration</td><td>documentés dans <code>docs/guide_iam.html</code> (admin, RH présence, agent salaire)</td></tr>
+</table>
+
+<h2>7. Livrables et jalons</h2>
+<table>
+  <tr><th>Lot</th><th>État</th></tr>
+  <tr><td>Référentiel utilisateurs, organisations, RBAC</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Authentification + politique de mot de passe + anti force brute</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>MFA par e-mail (SMTP + mode démo + test)</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>SSO à jeton unique + garde auto-déployable + portail</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Paramètre <code>sso_prompt</code> (ressaisie sur lien direct)</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Console d'administration graphique complète</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Attributs de poste (direction/service/fonction) + import CSV + annuaires de groupes</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Connexion sans mot de passe par e-mail ou téléphone (OTP)</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Serveur d'autorisation OAuth 2.0 / OIDC (PKCE, JWKS, id_token, refresh rotatifs, discovery)</td><td><span class="badge">Livré</span></td></tr>
+  <tr><td>Guide d'utilisation (PDF + HTML), présent cahier des charges</td><td><span class="badge">Livré</span></td></tr>
+</table>
+
+</body>
+</html>

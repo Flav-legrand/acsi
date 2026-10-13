@@ -1,0 +1,83 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Iam\IamUser;
+use App\Iam\Permissions;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+/**
+ * Écrans de DÉMONSTRATION des modules de Gestion des Partenaires.
+ *
+ * Ils ne contiennent aucune logique métier : ils montrent comment
+ * chaque route est protégée (routes/web.php) et comment l'interface
+ * masque ce que l'utilisateur ne peut pas faire (@iamcan dans les vues).
+ * Remplacez-les par vos contrôleurs métier en conservant les middlewares.
+ */
+class ModuleController extends Controller
+{
+    public function home(): View
+    {
+        return view('iam.dashboard', ['modules' => Permissions::MODULES]);
+    }
+
+    // Le module vient de ->defaults('module', ...) dans routes/web.php,
+    // l'identifiant éventuel du segment {id} de l'URL.
+
+    public function index(Request $request): View
+    {
+        return $this->screen($request, 'view', 'Liste');
+    }
+
+    public function create(Request $request): View
+    {
+        return $this->screen($request, 'create', 'Nouvel enregistrement');
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        return $this->back($request, 'Création autorisée (démonstration : rien n’est enregistré).');
+    }
+
+    public function edit(Request $request): View
+    {
+        return $this->screen($request, 'edit', 'Modification de l’enregistrement #'.$request->route('id'));
+    }
+
+    public function update(Request $request): RedirectResponse
+    {
+        return $this->back($request, 'Modification #'.$request->route('id').' autorisée (démonstration).');
+    }
+
+    public function destroy(Request $request): RedirectResponse
+    {
+        return $this->back($request, 'Suppression #'.$request->route('id').' autorisée (démonstration).');
+    }
+
+    public function export(Request $request): View
+    {
+        return $this->screen($request, 'export', 'Export');
+    }
+
+    private function back(Request $request, string $status): RedirectResponse
+    {
+        return redirect()->route($request->route('module').'.index')->with('status', $status);
+    }
+
+    private function screen(Request $request, string $action, string $title): View
+    {
+        $module = (string) $request->route('module');
+        abort_unless(isset(Permissions::MODULES[$module]), 404);
+
+        return view('iam.module', [
+            'module'  => $module,
+            'label'   => Permissions::MODULES[$module]['label'],
+            'actions' => Permissions::MODULES[$module]['actions'],
+            'action'  => $action,
+            'title'   => $title,
+            'user'    => IamUser::current(),
+        ]);
+    }
+}

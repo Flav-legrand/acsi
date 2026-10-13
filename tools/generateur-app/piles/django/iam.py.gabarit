@@ -1,0 +1,325 @@
+"""
+Client IAM — application @@NOM_APP@@ (@@CODE_APP@@)
+
+Généré le @@DATE@@ par tools/generateur-app. Adaptez les réglages de
+`settings.py`, rien d'autre : ce fichier ne contient aucun secret.
+
+Deux appels à l'IAM, et rien d'autre :
+
+    POST /api/sso/validate.php   échange du jeton à usage unique
+    GET  /api/userinfo.php      profil et permissions de CETTE application
+
+Ce module n'ouvre aucun accès direct à `iam_local`. Il ne connaît pas
+la table des utilisateurs : tout ce qu'il sait d'eux lui vient de l'IAM.
+Conséquence pratique : révoquer un rôle côté IAM prend effet ici en
+moins de 60 secondes, sans redéploiement et sans double saisie.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from urllib.parse import urlencode
+
+import requests
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+# Code applicatif tel que déclaré dans l'IAM (Applications > URL).
+CODE_APP = "@@CODE_APP@@"
+
+# Les permissions ci-dessous sont lues dans l'IAM au moment de la
+# génération. Ne les retapez pas à la main : régénérez le squelette.
+PERMISSIONS = {
+@@PERMS_PY@@
+}
+
+
+class AuthError(Exception):
+    """Authentification refusée, ou impossible à établir."""
+
+
+# ── Cache des profils ───────────────────────────────────────────
+#
+# L'IAM est interrogée à chaque requête : lent, et fragile en cas de
+# micro-coupure. Les profils sont donc mémorisés quelques secondes, par
+# couple (application, jeton).
+#
+# Mettre IAM_PROFILE_CACHE_TTL à 0 désactive le cache et rend chaque
+# requête immédiatement fidèle à l'IAM — utile pour vérifier une
+# révocation de rôle sans attendre.
+
+_cache: dict[str, tuple[float, dict]] = {}
+_cache_lock = threading.Lock()
+
+
+def _cache_ttl() -> int:
+    return max(0, int(settings.IAM.get("PROFILE_CACHE_TTL", 60)))
+
+
+def _cache_get(cle: str) -> dict | None:
+    if _cache_ttl() <= 0:
+        return None
+    with _cache_lock:
+        hit = _cache.get(cle)
+    if not hit:
+        return None
+    expires_at, payload = hit
+    if expires_at <= time.time():
+        with _cache_lock:
+            _cache.pop(cle, None)
+        return None
+    return payload
+
+
+def _cache_put(cle: str, payload: dict) -> None:
+    ttl = _cache_ttl()
+    if ttl <= 0:
+        return
+    with _cache_lock:
+        _cache[cle] = (time.time() + ttl, payload)
+
+
+def clear_profile_cache(access_token: str | None = None) -> None:
+    """Vide le cache en tout, ou uniquement pour un jeton donné."""
+    with _cache_lock:
+        if access_token is None:
+            _cache.clear()
+            return
+        for key in [k for k in _cache if access_token in k]:
+            _cache.pop(key, None)
+
+
+# ── Transport ───────────────────────────────────────────────────
+
+
+def _get(chemin: str, params: dict | None = None, token: str | None = None) -> dict:
+    url = f"{settings.IAM['BASE_URL']}{chemin}"
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    response = requests.get(
+        url, params=params, headers=headers, timeout=settings.IAM["TIMEOUT"]
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _post(chemin: str, payload: dict) -> dict:
+    url = f"{settings.IAM['BASE_URL']}{chemin}"
+    response = requests.post(url, json=payload, timeout=settings.IAM["TIMEOUT"])
+    response.raise_for_status()
+    return response.json()
+
+
+# ── Normalisation ───────────────────────────────────────────────
+#
+# L'IAM n'est pas cohérente sur ce point, et l'incohérence est
+# documentée dans ses propres sources :
+#
+#   - validate.php renvoie permissions = ['app.view', ...]      (chaînes)
+#   - userinfo.php  renvoie permissions = [{id, code, ...}]     (objets)
+#
+# Sans cette conversion, deux effets silencieux et pénibles :
+#
+#   * un set contenant des objets fait échouer `code in permissions`
+#     pour tout, et le rôle semble n'avoir AUCUN droit ;
+#   * un set d'objets non hashables lève TypeError dès la construction.
+#
+# Les deux font échouer l'autorisation SANS MESSAGE, ce qui se traduit
+# par une page blanche inexplicable. On accepte donc les deux formes.
+
+def _normaliser_permissions(brut) -> set[str]:
+    codes = set()
+    for permission in brut or []:
+        if isinstance(permission, str):
+            code = permission
+        elif isinstance(permission, dict):
+            code = permission.get("code")
+        else:
+            code = getattr(permission, "code", None)
+        if code:
+            codes.add(str(code))
+    return codes
+
+
+def _normaliser_roles(brut) -> list[dict]:
+    resultats = []
+    for role in brut or []:
+        if isinstance(role, str):
+            resultats.append({"code": role, "name": role})
+        elif isinstance(role, dict):
+            resultats.append(
+                {
+                    "code": role.get("code", ""),
+                    "name": role.get("name") or role.get("code", ""),
+                }
+            )
+    return resultats
+
+
+# ── Contrat SSO ─────────────────────────────────────────────────
+
+
+def app_config() -> dict:
+    """
+    Configuration publique de l'application, sans authentification.
+
+    GET /api/sso/app_config.php?code=<code>
+      -> {code, name, url, active, sso_prompt}
+
+    En cas d'échec, on ferme par défaut : `sso_prompt` à True force la
+    ré-authentification, ce qui est le comportement sûr quand l'IAM ne
+    répond pas.
+    """
+    def refuse():
+        logger.warning("IAM injoignable ou configuration refusée : accès fermé")
+        return {
+            "known": False,
+            "code": CODE_APP,
+            "name": CODE_APP,
+            "active": False,
+            "sso_prompt": True,
+        }
+
+    try:
+        data = _get("/api/sso/app_config.php", {"code": CODE_APP})
+    except requests.RequestException:
+        return refuse()
+
+    if data.get("error"):
+        logger.warning("Configuration IAM refusée : %s", data["error"])
+        return refuse()
+    return {"known": True, **data}
+
+
+def authorize_url(return_to: str | None = None, prompt: bool = False) -> str:
+    """
+    URL d'autorisation SSO de l'IAM.
+
+    sso/authorize.php attend :
+      app     le CODE applicatif, pas l'identifiant numérique
+      return  l'URL de rappel complète
+      prompt  la chaîne littérale "login" — un prompt=1 est ignoré
+
+    Le port n'est PAS comparé par l'IAM, qui ne retient que le nom
+    d'hôte. Les deux URL doivent donc rester sur le même hôte.
+    """
+    params = {"app": CODE_APP}
+    cible = return_to or settings.IAM.get("APP_URL", "")
+    if cible:
+        params["return"] = cible
+    if prompt:
+        params["prompt"] = "login"
+    return f"{settings.IAM['BASE_URL']}/sso/authorize.php?{urlencode(params)}"
+
+
+def logout_url(return_to: str | None = None) -> str:
+    """
+    URL de déconnexion IAM.
+
+    Attention : logout.php attend `redirect`, contrairement à
+    authorize.php qui attend `return`. C'est une vraie source de
+    confusion, le paramètre n'a pas le même nom.
+    """
+    params = {"redirect": return_to} if return_to else {}
+    base = f"{settings.IAM['BASE_URL']}/logout.php"
+    return f"{base}?{urlencode(params)}" if params else base
+
+
+def exchange_sso_token(token: str) -> dict:
+    """
+    Échange le jeton SSO à usage unique contre un jeton d'accès.
+
+    POST /api/sso/validate.php {"token": ..., "app_code": ...}
+      succès : {success, access_token, session_token, token_type,
+                user, roles, permissions, is_global_admin, app{...}}
+      échec  : {"error": "..."} avec 401 / 403 / 422
+
+    Deux pièges évités ici :
+
+      * L'ORDRE DES VÉRIFICATIONS DE L'IAM. Le jeton est consommé AVANT
+        le contrôle de correspondance avec app_code. Un app_code erroné
+        détruit donc le jeton sans rien rendre : l'utilisateur doit
+        recommencer la connexion. D'où l'assertion sur CODE_APP au
+        démarrage, plutôt qu'un échec opaque à l'écran.
+
+      * AUCUN REFRESH TOKEN. validate.php n'en renvoie pas. Le jeton
+        d'accès expire (une heure par défaut) ; la seule sortie est
+        alors une nouvelle authentification SSO.
+    """
+    try:
+        data = _post(
+            "/api/sso/validate.php",
+            {"token": token, "app_code": CODE_APP},
+        )
+    except requests.RequestException:
+        logger.exception("Échange du jeton SSO impossible")
+        raise AuthError("IAM injoignable") from None
+
+    if data.get("error"):
+        raise AuthError(str(data["error"]))
+    if not data.get("success") or not data.get("access_token"):
+        raise AuthError("Réponse inattendue de l'IAM")
+
+    return {
+        "access_token": data["access_token"],
+        "user": data.get("user") or {},
+        "roles": _normaliser_roles(data.get("roles")),
+        "permissions": _normaliser_permissions(data.get("permissions")),
+        "is_admin": bool(data.get("is_global_admin")),
+        "app_id": (data.get("app") or {}).get("id"),
+        "app_code": (data.get("app") or {}).get("code"),
+    }
+
+
+def fetch_profile(access_token: str, app_id: int | None) -> dict:
+    """
+    Profil de l'utilisateur sur CETTE application.
+
+    GET /api/userinfo.php?app_id=<N>
+    Authorization: Bearer <jeton>
+
+    `app_id` EST CE QUI RATTACHE LES PERMISSIONS À UNE APPLICATION :
+    sans lui, userinfo.php renvoie les permissions de TOUS les rôles de
+    l'utilisateur. Un technicien de la Maintenance se retrouverait avec
+    les droits RH. Ce paramètre n'est donc pas une optimisation, c'est
+    la frontière de sécurité.
+
+    Le jeton d'accès reste côté serveur : il n'est jamais renvoyé au
+    navigateur.
+    """
+    cle = f"{app_id}:{access_token}"
+    cached = _cache_get(cle)
+    if cached is not None:
+        return cached
+
+    try:
+        data = _get(
+            "/api/userinfo.php",
+            {"app_id": app_id} if app_id else None,
+            token=access_token,
+        )
+    except requests.RequestException as exc:
+        # 401/403 = jeton expiré ou révoqué : c'est une déconnexion,
+        # pas une panne. On vide le cache pour ne pas réessayer.
+        clear_profile_cache(access_token)
+        logger.warning("Profil IAM inaccessible : session considérée expirée (%s)", exc)
+        raise AuthError("Session expirée ou droits révoqués dans l'IAM.") from None
+
+    if data.get("error"):
+        clear_profile_cache(access_token)
+        raise AuthError(str(data["error"]))
+
+    profil = {
+        "id": data.get("id"),
+        "username": data.get("username"),
+        "email": data.get("email"),
+        "full_name": data.get("full_name"),
+        "organization": data.get("organization"),
+        "is_admin": bool(data.get("is_admin")),
+        "roles": _normaliser_roles(data.get("roles")),
+        "permissions": sorted(_normaliser_permissions(data.get("permissions"))),
+    }
+    _cache_put(cle, profil)
+    return profil

@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Iam\IamClient;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
+/**
+ * Vérifie la configuration IAM de @@NOM_APP@@ sans connecter personne.
+ *
+ *   php artisan iam:check
+ *
+ * Contrôles : configuration .env, découverte OIDC, clés JWKS,
+ * authentification du client (le secret est-il le bon ?), point de
+ * validation SSO, colonne users.iam_sub, cookie de session dédié.
+ */
+class IamCheck extends Command
+{
+    protected $signature = 'iam:check';
+
+    protected $description = 'Vérifie la configuration IAM (OIDC, JWKS, secret client, SSO maison)';
+
+    private int $failures = 0;
+
+    public function handle(IamClient $iam): int
+    {
+        $this->info('== Configuration');
+        foreach (['base_url', 'app_code', 'client_id', 'client_secret', 'redirect_uri', 'post_logout_redirect_uri'] as $key) {
+            $value = (string) $iam->config($key);
+            $shown = $key === 'client_secret' ? ($value === '' ? '' : str_repeat('•', 8).substr($value, -4)) : $value;
+            $this->check($value !== '', sprintf('%-26s %s', $key, $shown ?: '(vide)'));
+        }
+        $this->line(sprintf('  %-28s %s', 'mode', $iam->mode()));
+        $this->check(config('session.cookie') !== 'laravel_session',
+            'Cookie de session dédié ('.config('session.cookie').') : deux applications sur « localhost » ne doivent pas partager « laravel_session »');
+
+        $this->info('== IAM');
+        try {
+            $discovery = $iam->http()->get($iam->internalUrl().'/.well-known/openid-configuration.php')->json();
+            $this->check(rtrim((string) ($discovery['issuer'] ?? ''), '/') === $iam->issuer(),
+                'Découverte OIDC : issuer = '.($discovery['issuer'] ?? '?'));
+        } catch (Throwable $e) {
+            $this->check(false, 'Découverte OIDC injoignable : '.$e->getMessage());
+        }
+
+        try {
+            $jwks = $iam->http()->get($iam->endpoint('jwks'))->json();
+            $this->check(! empty($jwks['keys']), 'JWKS : '.count($jwks['keys'] ?? []).' clé(s) publique(s)');
+        } catch (Throwable $e) {
+            $this->check(false, 'JWKS injoignable : '.$e->getMessage());
+        }
+
+        // Un code bidon : si le SECRET est faux, l'IAM répond 401
+        // invalid_client AVANT de regarder le code ; s'il est bon, il
+        // répond 400 invalid_grant (« Code inconnu »).
+        try {
+            $response = $iam->http()->asForm()->post($iam->endpoint('token'), [
+                'grant_type'    => 'authorization_code',
+                'code'          => 'iam-check-'.bin2hex(random_bytes(8)),
+                'redirect_uri'  => (string) $iam->config('redirect_uri'),
+                'client_id'     => $iam->clientId(),
+                'client_secret' => (string) $iam->config('client_secret'),
+            ]);
+            $error = (string) ($response->json('error') ?? '');
+            $this->check($error === 'invalid_grant', match ($error) {
+                'invalid_grant'  => 'Client OIDC reconnu et secret accepté',
+                'invalid_client' => 'Client inconnu, inactif ou SECRET refusé : '.$response->json('error_description'),
+                default          => "Réponse inattendue du point /token (HTTP {$response->status()}) : {$error}",
+            });
+        } catch (Throwable $e) {
+            $this->check(false, 'Point /token injoignable : '.$e->getMessage());
+        }
+
+        try {
+            $response = $iam->http()->asJson()->post($iam->endpoint('sso_validate'), [
+                'token' => 'iam-check-invalide', 'app_code' => $iam->appCode(),
+            ]);
+            $this->check($response->status() === 401, "SSO maison : validate.php répond (jeton factice refusé, HTTP {$response->status()})");
+        } catch (Throwable $e) {
+            $this->check(false, 'SSO maison injoignable : '.$e->getMessage());
+        }
+
+        $this->info('== Laravel');
+        try {
+            $this->check(Schema::hasColumn('users', 'iam_sub'), 'Colonne users.iam_sub (php artisan migrate)');
+        } catch (Throwable $e) {
+            $this->check(false, 'Base Laravel inaccessible : '.$e->getMessage());
+        }
+
+        $this->newLine();
+        $this->failures === 0 ? $this->info('Configuration IAM correcte.') : $this->error("{$this->failures} problème(s) à corriger.");
+
+        return $this->failures === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    private function check(bool $ok, string $label): void
+    {
+        $this->failures += $ok ? 0 : 1;
+        $this->line(($ok ? '  <info>✔</info> ' : '  <error>✘</error> ').$label);
+    }
+}

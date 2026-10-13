@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAM-Local — Guide complet du projet</title>
+<style>
+  :root {
+    --ink: #172b3a;
+    --muted: #5b6b78;
+    --blue: #145b78;
+    --green: #26745b;
+    --line: #d6e0e4;
+    --pale: #f1f6f6;
+    --warm: #fbf6e9;
+    --red: #9f3d37;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); font: 10.5pt/1.52 "Segoe UI", Arial, sans-serif; background: white; }
+  h1, h2, h3 { color: var(--ink); line-height: 1.2; }
+  h1 { margin: 0 0 12pt; font-size: 26pt; }
+  h2 { margin: 0 0 10pt; font-size: 19pt; }
+  h3 { margin: 14pt 0 6pt; font-size: 12pt; color: var(--blue); }
+  p { margin: 0 0 9pt; }
+  ul, ol { margin: 5pt 0 10pt; padding-left: 20pt; }
+  li { margin: 0 0 4pt; }
+  code { font: 9pt Consolas, "Courier New", monospace; color: #13576a; overflow-wrap: anywhere; }
+  .cover { min-height: 255mm; padding: 22mm 17mm; display: flex; flex-direction: column; justify-content: space-between; color: white; background: linear-gradient(145deg, #123c53 0%, #145b78 52%, #26745b 100%); page-break-after: always; }
+  .cover .brand { font-size: 12pt; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+  .cover .eyebrow { margin: 0 0 12pt; color: #bde4d8; font-size: 10pt; font-weight: 700; text-transform: uppercase; }
+  .cover h1 { max-width: 155mm; color: white; font-size: 38pt; }
+  .cover .lead { max-width: 145mm; color: #e1eef0; font-size: 15pt; }
+  .cover .cover-note { max-width: 145mm; border-left: 3px solid #a8d7c5; padding: 10pt 14pt; color: #ecf4f1; background: rgba(255,255,255,.08); }
+  .cover .meta { display: flex; justify-content: space-between; gap: 16pt; color: #d3e6e5; font-size: 9pt; }
+  .page { padding: 0; page-break-after: always; break-after: page; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  .kicker { margin-bottom: 5pt; color: var(--green); font-size: 9pt; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
+  .intro { max-width: 165mm; color: var(--muted); font-size: 12pt; }
+  .rule { width: 28mm; height: 3px; margin: 10pt 0 18pt; background: var(--green); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .panel { border: 1px solid var(--line); border-radius: 5px; padding: 11pt 12pt; background: white; break-inside: avoid; }
+  .panel.pale { background: var(--pale); }
+  .panel.warm { background: var(--warm); }
+  .panel h3 { margin-top: 0; }
+  .callout { margin: 10pt 0; border-left: 3px solid var(--blue); padding: 9pt 12pt; background: var(--pale); break-inside: avoid; }
+  .callout.warn { border-color: #b87816; background: var(--warm); }
+  .callout.danger { border-color: var(--red); background: #fbefee; }
+  .flow { display: flex; align-items: stretch; gap: 6pt; margin: 10pt 0 14pt; }
+  .flow .step { flex: 1; min-width: 0; border: 1px solid var(--line); border-top: 3px solid var(--blue); border-radius: 4px; padding: 8pt; background: #fbfdfd; }
+  .flow .arrow { align-self: center; color: var(--green); font-size: 15pt; font-weight: 700; }
+  .step b { display: block; margin-bottom: 4pt; color: var(--blue); }
+  table { width: 100%; margin: 8pt 0 12pt; border-collapse: collapse; font-size: 9.2pt; }
+  th { color: white; background: #174b61; text-align: left; }
+  th, td { border: 1px solid var(--line); padding: 6pt 7pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7faf9; }
+  .small { color: var(--muted); font-size: 9pt; }
+  .tag { display: inline-block; margin: 1pt 2pt 1pt 0; border: 1px solid #b8d2cd; border-radius: 20px; padding: 2pt 7pt; color: #205e4c; background: #eff7f3; font-size: 8.5pt; }
+  .codebox { border-radius: 4px; padding: 9pt 11pt; color: #dce9ef; background: #183444; font: 9pt/1.45 Consolas, monospace; overflow-wrap: anywhere; }
+  .footer-note { margin-top: 14pt; border-top: 1px solid var(--line); padding-top: 6pt; color: var(--muted); font-size: 8.5pt; }
+  @page { size: A4; margin: 17mm 16mm 18mm; }
+  @page:first { margin: 0; }
+  @media screen {
+    body { max-width: 900px; margin: 24px auto; padding: 0 22px; }
+    .cover { margin: -24px -22px 24px; }
+    .page { padding: 24px 0; border-bottom: 1px solid var(--line); }
+  }
+  @media print {
+    .cover { min-height: 297mm; }
+    .page { min-height: 255mm; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<header class="cover">
+  <div class="brand">IAM-Local · ACSI</div>
+  <div>
+    <p class="eyebrow">Architecture · fonctionnement · exploitation</p>
+    <h1>Comprendre le projet IAM-Local</h1>
+    <p class="lead">Le guide de référence pour comprendre comment les identités, les applications, les rôles et les connexions SSO s’articulent.</p>
+  </div>
+  <div class="cover-note"><b>En une phrase</b><br>IAM-Local centralise les comptes et les décisions d’accès; chaque application cliente conserve son interface et applique les permissions reçues.</div>
+  <div class="meta"><span>Guide technique et fonctionnel</span><span>Édition du 5 octobre 2026</span></div>
+</header>
+
+<main>
+<section class="page">
+  <p class="kicker">01 · Vue d’ensemble</p>
+  <h2>À quoi sert IAM-Local ?</h2>
+  <p class="intro">IAM-Local est une plateforme d’Identity and Access Management (IAM) écrite principalement en PHP. Elle fournit un point central pour authentifier les personnes, publier les applications disponibles et définir les droits par application.</p>
+  <div class="rule"></div>
+  <div class="grid-2">
+    <div class="panel pale"><h3>Ce que l’IAM centralise</h3><ul><li>Comptes, profils, états et rattachements organisationnels.</li><li>Connexion, politique de mot de passe, MFA et sessions.</li><li>Catalogue d’applications, rôles, permissions et attributions.</li><li>Journal d’audit et émission de jetons SSO/OIDC.</li></ul></div>
+    <div class="panel"><h3>Ce que l’IAM ne remplace pas</h3><ul><li>Le code métier, les écrans et les données de chaque application.</li><li>La base de données métier de l’application cliente.</li><li>Le contrôle de permission dans une application qui n’applique pas les droits reçus.</li></ul></div>
+  </div>
+  <h3>Architecture simplifiée</h3>
+  <div class="flow">
+    <div class="step"><b>Utilisateur</b>Ouvre le portail ou une application.</div><div class="arrow">→</div>
+    <div class="step"><b>IAM-Local</b>Authentifie, vérifie MFA et autorisations.</div><div class="arrow">→</div>
+    <div class="step"><b>Application cliente</b>Établit sa session et contrôle les permissions.</div>
+  </div>
+  <div class="callout"><b>Deux mécanismes d’intégration.</b> Le SSO natif émet un jeton court à usage unique échangé côté serveur. OAuth 2.0 / OIDC suit un protocole standard et convient aux clients Django, Flutter ou autres frameworks qui disposent d’un connecteur OIDC.</div>
+  <p class="small">Environnement documenté : PHP 8.x, Apache/WAMP, MySQL et URL locale <code>http://localhost/IAM-Local</code>. Ce guide décrit le dépôt IAM-Local; les projets métier voisins restent des applications séparées.</p>
+</section>
+
+<section class="page">
+  <p class="kicker">02 · Carte du dépôt</p>
+  <h2>Où se trouve chaque fonction ?</h2>
+  <p class="intro">Le code est organisé par responsabilité : pages d’administration, API JSON, services communs et points d’entrée protocolaires.</p>
+  <table>
+    <tr><th>Dossier / fichier</th><th>Responsabilité</th><th>Exemples</th></tr>
+    <tr><td><code>admin/</code></td><td>Console graphique protégée par authentification et rôle administrateur.</td><td>Applications, utilisateurs, rôles, audit, sessions, OAuth/OIDC.</td></tr>
+    <tr><td><code>api/</code></td><td>API REST JSON consommée par les applications et outils.</td><td>Login, utilisateurs, permissions, sessions, SSO validate, OAuth token.</td></tr>
+    <tr><td><code>includes/</code></td><td>Logique partagée : base, sessions, règles, mail et OAuth.</td><td><code>functions.php</code>, <code>oauth.php</code>, <code>mailer.php</code>.</td></tr>
+    <tr><td><code>sso/</code> et <code>oauth.php</code></td><td>Autorisation interactive et retour vers les clients.</td><td>Émission SSO; consentement Authorization Code.</td></tr>
+    <tr><td><code>client/</code> et <code>admin/_sso_generator.php</code></td><td>Bibliothèque PHP et génération du garde pour les applications compatibles.</td><td>Garde auto-prepend, client SSO, téléchargement.</td></tr>
+    <tr><td><code>config/</code></td><td>Configuration d’environnement générée à l’installation.</td><td>URL IAM, base MySQL, durées de session, MFA, secrets.</td></tr>
+    <tr><td><code>sql/</code></td><td>Schéma, jeux de données et scripts de migration.</td><td><code>schema.sql</code>, seeds, migration des rôles par application.</td></tr>
+    <tr><td><code>docs/</code></td><td>Guides, cahier des charges et diagrammes.</td><td>Guide utilisateur, UML, ce guide complet.</td></tr>
+  </table>
+  <h3>Pages principales</h3>
+  <div class="grid-2">
+    <div class="panel"><b>Espace utilisateur</b><br><code>login.php</code>, <code>portal.php</code>, <code>profile.php</code>, <code>mfa.php</code>, <code>logout.php</code>.</div>
+    <div class="panel"><b>Installation et lancement</b><br><code>install.php</code> initialise la base et la configuration; <code>index.php</code> oriente vers l’espace approprié.</div>
+  </div>
+  <div class="callout warn"><b>Configuration sensible.</b> <code>config/config.php</code> contient les paramètres d’accès et secrets. Ne publiez pas ce fichier, les fichiers <code>.env</code> ni les sauvegardes de base.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">03 · Modèle métier</p>
+  <h2>Identités, applications et droits</h2>
+  <p class="intro">Le contrôle d’accès suit le modèle RBAC : un utilisateur reçoit un ou plusieurs rôles pour une application; chaque rôle regroupe des permissions.</p>
+  <div class="flow">
+    <div class="step"><b>Utilisateur</b>Identité, état, MFA, organisation.</div><div class="arrow">→</div>
+    <div class="step"><b>Attribution</b><code>user_roles</code> lie utilisateur, rôle et application.</div><div class="arrow">→</div>
+    <div class="step"><b>Rôle applicatif</b><code>roles.application_id</code> définit son propriétaire.</div><div class="arrow">→</div>
+    <div class="step"><b>Permissions</b><code>role_permissions</code> relie le rôle aux droits.</div>
+  </div>
+  <table>
+    <tr><th>Ensemble de tables</th><th>Contenu</th><th>Pourquoi c’est important</th></tr>
+    <tr><td><code>users</code>, <code>organizations</code>, <code>groups</code>, <code>user_groups</code></td><td>Identités et structure organisationnelle.</td><td>La connexion identifie l’utilisateur; le statut détermine s’il peut continuer.</td></tr>
+    <tr><td><code>applications</code></td><td>Code, nom, URL, état, configuration de pont SSO.</td><td>Le portail affiche les applications actives; l’autorisation vérifie la cible.</td></tr>
+    <tr><td><code>roles</code>, <code>permissions</code>, <code>role_permissions</code>, <code>user_roles</code></td><td>Rôles propres à une application et droits fins.</td><td>Les rôles d’une application ne doivent pas être copiés à une autre.</td></tr>
+    <tr><td><code>sessions</code>, <code>sso_tokens</code></td><td>Sessions IAM révocables et jetons SSO courts.</td><td>Un jeton SSO n’est valable qu’une fois et est consommé de façon transactionnelle.</td></tr>
+    <tr><td><code>oauth_clients</code>, <code>oauth_codes</code>, <code>oauth_keys</code>, <code>refresh_tokens</code></td><td>Clients OIDC, codes, clés RSA et rafraîchissements.</td><td>Sépare client confidentiel serveur et client public PKCE.</td></tr>
+    <tr><td><code>otp_codes</code>, <code>mfa_devices</code>, <code>login_attempts</code>, <code>audit_logs</code></td><td>MFA, anti-brute-force et traçabilité.</td><td>Supporte les contrôles et les investigations.</td></tr>
+  </table>
+  <div class="callout"><b>Conséquence pratique.</b> Si la liste de rôles est vide pour une nouvelle application, ce n’est pas nécessairement une panne : il faut créer un rôle propriétaire de cette application, lui attacher des permissions, puis attribuer ce rôle à l’utilisateur.</div>
+  <p class="small">Le schéma de référence est <code>sql/schema.sql</code>; certains déploiements anciens sont adaptés par des migrations idempotentes au démarrage ou à la mise à niveau.</p>
+</section>
+
+<section class="page">
+  <p class="kicker">04 · Parcours d’authentification</p>
+  <h2>Comment une connexion se déroule</h2>
+  <h3>Connexion au portail IAM</h3>
+  <ol><li>L’utilisateur saisit identifiant/e-mail/téléphone et mot de passe.</li><li>IAM contrôle le statut, le hash bcrypt, les tentatives et le verrouillage.</li><li>Selon la politique, IAM exige le MFA par code e-mail.</li><li>Un changement de mot de passe peut être imposé au premier accès ou après expiration.</li><li>IAM ouvre sa session puis affiche le portail et les applications autorisées.</li></ol>
+  <h3>SSO natif vers une application cliente</h3>
+  <div class="flow">
+    <div class="step"><b>1 · Demande</b>Le garde intercepte l’accès et redirige vers IAM.</div><div class="arrow">→</div>
+    <div class="step"><b>2 · Contrôles</b>IAM vérifie application active, session/MFA et rôle.</div><div class="arrow">→</div>
+    <div class="step"><b>3 · Jeton</b>Jeton aléatoire, expiration courte (60 s par défaut), usage unique.</div><div class="arrow">→</div>
+    <div class="step"><b>4 · Échange</b>L’application appelle <code>api/sso/validate.php</code> et ouvre sa session locale.</div>
+  </div>
+  <p>L’application reçoit profil, rôles et permissions filtrés pour son identifiant. Elle doit ensuite vérifier les permissions sur ses pages et actions; l’IAM ne peut pas deviner les opérations métier propres à l’application.</p>
+  <h3>OIDC Authorization Code + PKCE</h3>
+  <p>OIDC convient aux frameworks non-PHP qui ont un connecteur : redirection vers l’autorisation IAM, consentement, retour avec un code, échange contre des jetons, puis lecture du profil via UserInfo. Django utilise un client confidentiel côté serveur; Flutter utilise un client public sans secret avec PKCE S256.</p>
+  <table>
+    <tr><th>Élément</th><th>Valeur / rôle</th></tr>
+    <tr><td>Issuer</td><td><code>IAM_BASE_URL</code></td></tr>
+    <tr><td>Découverte</td><td><code>/.well-known/openid-configuration.php</code></td></tr>
+    <tr><td>Autorisation</td><td><code>/oauth.php</code></td></tr>
+    <tr><td>Token / UserInfo / JWKS</td><td><code>/api/oauth/token.php</code>, <code>/api/oauth/userinfo.php</code>, <code>/api/oauth/jwks.php</code></td></tr>
+    <tr><td>Scopes</td><td><code>openid</code>, <code>profile</code>, <code>email</code></td></tr>
+  </table>
+  <div class="callout warn"><b>Limite à connaître.</b> UserInfo fournit l’identité et les claims de profil; les rôles et permissions applicatifs ne sont pas actuellement renvoyés comme claims OIDC.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">05 · Modules fonctionnels</p>
+  <h2>Ce que l’administration permet de gérer</h2>
+  <table>
+    <tr><th>Module</th><th>Fonctions principales</th><th>Notion associée</th></tr>
+    <tr><td>Tableau de bord</td><td>Indicateurs et accès rapides aux fonctions d’administration.</td><td>Vue de synthèse.</td></tr>
+    <tr><td>Utilisateurs</td><td>Créer, modifier, désactiver, réinitialiser, importer; attribuer rôles et organisations.</td><td>Cycle de vie des identités.</td></tr>
+    <tr><td>Groupes</td><td>Organiser des utilisateurs en ensembles réutilisables.</td><td>Organisation logique.</td></tr>
+    <tr><td>Rôles &amp; permissions</td><td>Créer les droits, composer les rôles, associer permissions et applications.</td><td>RBAC.</td></tr>
+    <tr><td>Applications</td><td>Catalogue, état, SSO, permissions, accès utilisateurs, intégration et diagnostic local.</td><td>Clients métier.</td></tr>
+    <tr><td>Organisations</td><td>Hiérarchie et rattachement institutionnel.</td><td>Contexte du compte.</td></tr>
+    <tr><td>Sessions / audit</td><td>Consulter ou révoquer les sessions; filtrer l’historique d’événements.</td><td>Contrôle opérationnel.</td></tr>
+    <tr><td>OAuth / OIDC</td><td>Créer clients Django/serveur, Flutter public PKCE et services machine-à-machine; rotation JWKS.</td><td>Fédération protocolée.</td></tr>
+    <tr><td>E-mail &amp; paramètres</td><td>Configurer SMTP/OAuth fournisseur, politique de mot de passe, CORS et sécurité API.</td><td>Configuration d’exploitation.</td></tr>
+  </table>
+  <h3>Parcours recommandé pour onboarder une application</h3>
+  <ol><li>Créer la fiche d’application et vérifier URL/hébergement.</li><li>Définir des permissions métier explicites.</li><li>Créer des rôles propres à l’application et leur attribuer les permissions nécessaires.</li><li>Attribuer un rôle à chaque utilisateur autorisé.</li><li>Configurer l’intégration SSO native PHP ou enregistrer un client OIDC.</li><li>Tester avec un compte à privilèges minimaux, puis vérifier l’audit.</li></ol>
+</section>
+
+<section class="page">
+  <p class="kicker">06 · API et intégrations</p>
+  <h2>Interfaces utilisées par les clients</h2>
+  <table>
+    <tr><th>Famille</th><th>Endpoint</th><th>Usage</th></tr>
+    <tr><td>SSO</td><td><code>/sso/authorize.php</code></td><td>Contrôle l’application et l’accès; émet le jeton à usage unique.</td></tr>
+    <tr><td>SSO</td><td><code>/api/sso/validate.php</code></td><td>Échange POST du jeton et du code application contre identité, rôles et permissions.</td></tr>
+    <tr><td>Identité</td><td><code>/api/login.php</code>, <code>/api/logout.php</code>, <code>/api/userinfo.php</code></td><td>Connexion API, sortie, informations utilisateur.</td></tr>
+    <tr><td>Accès</td><td><code>/api/roles.php</code>, <code>/api/permissions.php</code></td><td>Lire rôles et droits autorisés.</td></tr>
+    <tr><td>MFA</td><td><code>/api/mfa/send.php</code>, <code>/api/mfa/verify.php</code></td><td>Émettre et vérifier un OTP.</td></tr>
+    <tr><td>OIDC</td><td><code>/oauth.php</code>, <code>/api/oauth/token.php</code>, <code>/api/oauth/userinfo.php</code></td><td>Autorisation, échange/rotation de jetons et profil.</td></tr>
+    <tr><td>OIDC</td><td><code>/api/oauth/jwks.php</code>, <code>/.well-known/openid-configuration.php</code></td><td>Clés publiques et découverte.</td></tr>
+    <tr><td>Administration</td><td><code>/api/users.php</code>, <code>/api/roles.php</code>, <code>/api/sessions.php</code>, <code>/api/audit_logs.php</code></td><td>API d’administration protégées par les contrôles IAM.</td></tr>
+  </table>
+  <h3>Intégration selon la technologie</h3>
+  <div class="grid-2">
+    <div class="panel pale"><h3>PHP local</h3><p>Garde généré, auto-prepend Apache si le module et les droits le permettent; sinon inclusion manuelle. Le garde appelle l’API de validation.</p></div>
+    <div class="panel"><h3>Django / serveur</h3><p>Client OIDC confidentiel. Le secret reste côté serveur; callback HTTPS exact en production. Utiliser une bibliothèque OIDC maintenue.</p></div>
+    <div class="panel"><h3>Flutter / mobile</h3><p>Client public sans secret. PKCE S256 obligatoire; URI de callback native déclarée à l’identique dans l’app et IAM.</p></div>
+    <div class="panel warm"><h3>SPA / autre framework</h3><p>Doit disposer d’un connecteur OIDC. Les secrets ne vont jamais dans le navigateur. Une passerelle ou un adaptateur peut être nécessaire.</p></div>
+  </div>
+  <p class="small">L’enregistrement graphique prépare les paramètres du client; il ne peut pas installer automatiquement une bibliothèque ou modifier un projet externe arbitraire.</p>
+</section>
+
+<section class="page">
+  <p class="kicker">07 · Sécurité</p>
+  <h2>Les contrôles structurants</h2>
+  <table>
+    <tr><th>Risque</th><th>Contrôle implémenté</th><th>Point d’exploitation</th></tr>
+    <tr><td>Vol de mot de passe</td><td>Hash bcrypt, politique et historique des mots de passe.</td><td>Forcer le changement d’un mot de passe initial.</td></tr>
+    <tr><td>Force brute</td><td>Compteur d’échecs, verrouillage, limites par IP/compte.</td><td>Vérifier le journal lors d’un verrouillage.</td></tr>
+    <tr><td>Compte compromis</td><td>MFA OTP, expiration et révocation de sessions.</td><td>SMTP vide = mode démonstration local; configurer un vrai SMTP pour usage réel.</td></tr>
+    <tr><td>Rejeu SSO</td><td>Jeton aléatoire, courte durée, consommation atomique à usage unique.</td><td>Ne jamais réutiliser ou exposer un jeton dans une capture publique.</td></tr>
+    <tr><td>Redirection ouverte</td><td>Vérification de l’URL de retour et URI OIDC enregistrées.</td><td>Utiliser en production des URI HTTPS exactes.</td></tr>
+    <tr><td>Secret client exposé</td><td>Secret serveur affiché une seule fois; client Flutter sans secret.</td><td>Conserver les secrets confidentiels dans le serveur, hors dépôt Git.</td></tr>
+    <tr><td>Élévation de privilèges</td><td>Rôles par application et vérification serveur des permissions/scopes.</td><td>Appliquer les droits côté backend métier, pas uniquement dans l’interface.</td></tr>
+    <tr><td>Actions non traçables</td><td>Journal d’audit avec utilisateur, action, IP et contexte.</td><td>Ne pas y écrire mot de passe, secret client ou jeton brut.</td></tr>
+  </table>
+  <div class="callout danger"><b>Configuration locale ≠ production.</b> L’installation d’exemple utilise localhost et un compte MySQL local. Avant exposition réseau : HTTPS obligatoire, secrets remplacés, compte DB dédié et à privilèges limités, SMTP réel, sauvegardes et politique CORS restrictive.</div>
+  <h3>Durées connues par défaut</h3>
+  <p><span class="tag">session IAM : 1 h</span><span class="tag">inactivité : 30 min</span><span class="tag">jeton SSO : 60 s</span><span class="tag">OTP : 5 min</span><span class="tag">code OAuth : 5 min</span><span class="tag">access token OAuth : 15 min</span><span class="tag">refresh token : 30 jours</span></p>
+</section>
+
+<section class="page">
+  <p class="kicker">08 · Installation et exploitation</p>
+  <h2>Installer, configurer, vérifier</h2>
+  <h3>Prérequis locaux</h3>
+  <ul><li>Apache avec PHP 8.x et extensions PDO MySQL, OpenSSL et mbstring.</li><li>MySQL; la base par défaut est <code>iam_local</code>.</li><li>Composer pour PHPMailer et les dépendances OAuth.</li><li>WAMP/XAMPP ou environnement équivalent; démarrer Apache et MySQL avant l’installation.</li></ul>
+  <h3>Séquence d’installation</h3>
+  <ol><li>Placer le dépôt dans le document root web sous <code>IAM-Local</code>.</li><li>Ouvrir <code>/IAM-Local/install.php</code>.</li><li>Renseigner l’URL de base, la connexion MySQL et le compte administrateur initial.</li><li>Choisir si les données de démonstration doivent être chargées.</li><li>Enregistrer le mot de passe initial de façon sûre, changer-le à la première connexion, puis contrôler les comptes et rôles.</li><li>Installer les dépendances Composer avec <code>composer install</code> si elles ne sont pas déjà présentes.</li></ol>
+  <h3>Points de contrôle après installation</h3>
+  <div class="grid-2">
+    <div class="panel"><b>Connexion</b><br>Le login accepte les identifiants prévus; MFA et SMTP réagissent selon la configuration.</div>
+    <div class="panel"><b>Portail</b><br>L’application apparaît uniquement si elle est active et l’utilisateur autorisé.</div>
+    <div class="panel"><b>SSO PHP</b><br>L’état d’intégration indique garde déployé, manuel ou erreur de chemin/droits.</div>
+    <div class="panel"><b>OIDC</b><br>Découverte JSON, callbacks, PKCE, UserInfo et JWKS sont atteignables.</div>
+  </div>
+  <div class="callout warn"><b>Ne pas relancer une réinstallation sans sauvegarde.</b> L’installateur est conçu pour initialiser/mettre à niveau; vérifier son comportement et sauvegarder la base avant toute opération de maintenance sur des données utiles.</div>
+  <h3>Dépannage rapide</h3>
+  <table><tr><th>Symptôme</th><th>Vérifications</th></tr>
+    <tr><td>Application absente du portail</td><td>Active; utilisateur lié à un rôle de cette application; rôle avec permissions attendues.</td></tr>
+    <tr><td>Jeton SSO invalide</td><td>Recommencer depuis le portail; jeton expiré ou déjà consommé; vérifier l’app_code et l’application cible.</td></tr>
+    <tr><td>Garde PHP non actif</td><td>État de déploiement, chemin local, écriture du fichier, module PHP Apache et `.htaccess`.</td></tr>
+    <tr><td>OIDC redirect_uri invalide</td><td>URI callback exactement identique à celle enregistrée, y compris schéma, port et slash final.</td></tr>
+    <tr><td>Flutter n’échange pas le code</td><td>Client public, aucune authentification par secret, PKCE S256, verifier/challenge issus de la même transaction.</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <p class="kicker">09 · Limites et plan de compréhension</p>
+  <h2>Ce qu’il faut retenir</h2>
+  <div class="grid-2">
+    <div class="panel pale"><h3>Forces du projet</h3><ul><li>Parcours identités, MFA et SSO déjà réunis.</li><li>Console pour utilisateurs, applications, rôles, permissions et audit.</li><li>Modèle RBAC par application inspiré des clients/roles.</li><li>SSO natif simple pour les applications PHP locales.</li><li>OIDC utilisable par des clients confidentiels et publics PKCE.</li></ul></div>
+    <div class="panel warm"><h3>Limites à garder visibles</h3><ul><li>Le garde auto-déployé n’est pas universel : il protège les applications PHP compatibles.</li><li>Un framework externe doit avoir un connecteur OIDC ou un adaptateur préinstallé.</li><li>UserInfo OIDC ne fournit pas actuellement les rôles applicatifs.</li><li>Les données métier des applications clientes restent dans leurs propres bases.</li><li>L’environnement local de démonstration n’est pas un profil production.</li></ul></div>
+  </div>
+  <h3>Ordre de lecture conseillé du code</h3>
+  <ol><li><code>install.php</code> et <code>sql/schema.sql</code> : initialisation et modèle de données.</li><li><code>includes/functions.php</code> : sessions, utilisateurs, RBAC, OTP, tokens et audit.</li><li><code>login.php</code>, <code>mfa.php</code> et <code>portal.php</code> : parcours utilisateur.</li><li><code>sso/authorize.php</code>, <code>api/sso/validate.php</code> et <code>admin/_sso_generator.php</code> : SSO natif.</li><li><code>includes/oauth.php</code>, <code>oauth.php</code> et <code>api/oauth/</code> : OIDC.</li><li><code>admin/</code> : workflows graphiques et contrôles des données.</li></ol>
+  <h3>Glossaire</h3>
+  <p><b>IAM</b> : gestion des identités et accès. <b>SSO</b> : connexion unique entre applications. <b>OIDC</b> : protocole d’identité basé sur OAuth 2.0. <b>RBAC</b> : droits attribués par rôle. <b>PKCE</b> : preuve cryptographique qui protège l’échange du code pour les clients publics. <b>JWKS</b> : publication des clés publiques nécessaires à la vérification des jetons signés.</p>
+  <div class="footer-note">Document de compréhension du dépôt IAM-Local · Source technique : code PHP, schéma SQL et documentation présents dans le projet · Aucune valeur de secret incluse.</div>
+</section>
+<section class="page">
+  <p class="kicker">10 · Manuel d’utilisation</p>
+  <h2>Première connexion et navigation</h2>
+  <p class="intro">Cette partie explique les actions courantes dans l’interface, sans avoir besoin de lire le code.</p>
+  <div class="rule"></div>
+  <h3>Ouvrir une session</h3>
+  <ol>
+    <li>Ouvrir <code>http://localhost/IAM-Local/login.php</code>.</li>
+    <li>Saisir l’identifiant ou l’adresse e-mail et le mot de passe transmis par l’administrateur.</li>
+    <li>Dans la configuration actuelle, le MFA est demandé aux comptes non administrateurs. Saisir le code reçu par e-mail; sans SMTP configuré, le mode de démonstration affiche le code à l’écran.</li>
+    <li>Si un changement de mot de passe est demandé, le faire avant de continuer.</li>
+    <li>Le portail affiche les applications actives auxquelles le compte a reçu un rôle.</li>
+  </ol>
+  <div class="grid-2">
+    <div class="panel pale"><h3>Portail utilisateur</h3><p>Ouvrir une application, consulter le profil, changer le mot de passe et voir ses sessions selon les options disponibles.</p></div>
+    <div class="panel"><h3>Console d’administration</h3><p>Accessible depuis <code>/admin/</code> aux administrateurs IAM. Un rôle « admin » métier dans une autre application ne donne pas ces droits.</p></div>
+  </div>
+  <h3>Déconnexion et sessions</h3>
+  <p>La déconnexion ferme la session IAM courante. Un administrateur peut révoquer une session depuis <b>Administration → Sessions</b>; l’utilisateur peut fermer ses autres sessions depuis son profil. Valeurs par défaut : durée maximale d’une heure et déconnexion après 30 minutes d’inactivité.</p>
+  <div class="callout warn"><b>Incident de sécurité.</b> Désactiver le compte puis révoquer ses sessions; retirer uniquement son accès à une application ne coupe pas une session déjà ouverte.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">11 · Comptes et organisation</p>
+  <h2>Créer et administrer les utilisateurs</h2>
+  <h3>Créer un compte</h3>
+  <ol>
+    <li>Ouvrir <b>Administration → Utilisateurs → Nouvel utilisateur</b>.</li>
+    <li>Renseigner prénom, nom, e-mail et mot de passe; compléter téléphone, identifiant, matricule et informations de poste si connus.</li>
+    <li>Choisir l’organisation si elle est déjà créée. Les rôles sont attribuables depuis cette fiche ou depuis la carte de l’application.</li>
+    <li>Enregistrer et transmettre les informations d’accès par un canal sûr.</li>
+  </ol>
+  <h3>Modifier, réinitialiser ou désactiver</h3>
+  <ul>
+    <li>Rechercher la personne par nom, e-mail ou matricule; utiliser <b>Modifier</b> pour le profil, l’organisation, les groupes, le statut et les rôles.</li>
+    <li>Utiliser <b>Réinitialiser le mot de passe</b> en cas d’oubli, puis communiquer le nouveau mot de passe de façon sécurisée.</li>
+    <li>Désactiver un compte pour interdire les prochaines connexions; révoquer aussi les sessions ouvertes si nécessaire.</li>
+    <li>La suppression est définitive; le compte administrateur principal est protégé.</li>
+  </ul>
+  <h3>Importer plusieurs personnes par CSV</h3>
+  <ol>
+    <li>Dans <b>Utilisateurs</b>, télécharger le modèle CSV fourni par l’interface.</li>
+    <li>Conserver les en-têtes. Les colonnes obligatoires sont <code>email</code>, <code>first_name</code> et <code>last_name</code>; les autres couvrent identifiant, téléphone, matricule, organisation, direction, service, fonction et statut.</li>
+    <li>Remplir en UTF-8; virgule ou point-virgule est accepté. Les e-mails déjà existants sont ignorés.</li>
+    <li>Importer et lire le bilan des comptes créés, doublons et lignes rejetées; distribuer les accès temporairement par un canal sûr.</li>
+  </ol>
+  <div class="callout">Créer d’abord les organisations, puis les utilisateurs : le rattachement hiérarchique sera disponible dans leurs formulaires.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">12 · Ajouter une application</p>
+  <h2>Suivre l’assistant d’intégration</h2>
+  <p>Ouvrir <b>Administration → Applications → Ajouter une application</b>. L’assistant en trois étapes enregistre le projet au catalogue et vérifie le type d’installation.</p>
+  <h3>Étape 1 — Informations de l’application</h3>
+  <ol><li>Saisir le nom affiché aux utilisateurs.</li><li>Vérifier le code technique proposé; il doit être unique et utilise lettres minuscules, chiffres et tirets.</li><li>Saisir l’URL que les utilisateurs ouvriront, puis une description facultative.</li><li>Cliquer sur <b>Continuer</b>.</li></ol>
+  <h3>Étape 2 — Connexion IAM</h3>
+  <ol><li>Le SSO natif est le parcours prévu pour un garde PHP. Pour Django ou Flutter, ouvrir <b>OAuth / OIDC</b>.</li><li>Cocher « Redemander le mot de passe IAM » uniquement si la politique le demande à chaque accès direct.</li><li>Cliquer sur <b>Vérifier la configuration</b>. Lire chaque contrôle : code disponible, URL, dossier local, droits d’écriture, serveur PHP.</li><li>Un projet distant ou non inscriptible peut continuer en installation manuelle; son fichier de garde sera téléchargeable après création.</li></ol>
+  <h3>Étape 3 — Vérification et création</h3>
+  <ol><li>Vérifier nom, code, URL et mode d’installation.</li><li>Laisser désactivé tant que rôles et accès ne sont pas prêts; cocher « Activer dès sa création » seulement si la configuration est déjà préparée.</li><li>Cliquer sur <b>Créer et installer</b>. Le serveur répète les validations avant l’enregistrement.</li><li>Créer les permissions puis les rôles, attribuer un rôle à un utilisateur, activer et utiliser <b>Tester le parcours SSO</b>.</li></ol>
+  <div class="callout warn"><b>Une application n’a pas automatiquement de rôles.</b> La liste des rôles vide est normale à la création : les rôles sont propres à chaque application et se configurent séparément.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">13 · Permissions et accès</p>
+  <h2>Définir qui peut faire quoi</h2>
+  <div class="flow"><div class="step"><b>Permissions</b>Actions métier reconnues par l’application.</div><div class="arrow">→</div><div class="step"><b>Rôles</b>Profils qui regroupent les permissions.</div><div class="arrow">→</div><div class="step"><b>Utilisateurs</b>Personnes autorisées dans l’application.</div></div>
+  <h3>Créer les permissions</h3>
+  <p>Dans la carte d’application, ouvrir <b>Permissions</b> puis ajouter nom, code et description. Exemples : <code>mnt.equipement.view</code>, <code>mnt.intervention.assign</code> ou <code>mnt.piece.manage</code>. Les codes doivent être contrôlés par le backend métier pour réellement protéger les actions.</p>
+  <h3>Créer un rôle et lui affecter des droits</h3>
+  <ol><li>Ouvrir <b>Rôles &amp; permissions → Créer un rôle</b>.</li><li>Définir son nom, son code, sa description et choisir l’application propriétaire.</li><li>Sur la carte du rôle, ouvrir <b>Permissions</b>, cocher les droits nécessaires et enregistrer.</li></ol>
+  <h3>Attribuer le rôle à une personne</h3>
+  <ol><li>Dans la carte de l’application, ouvrir <b>Accès utilisateurs</b>.</li><li>Choisir un utilisateur actif et un rôle de cette application.</li><li>Cliquer sur <b>Donner l’accès</b>. Pour retirer l’accès, utiliser l’action de retrait dans la liste.</li></ol>
+  <table><tr><th>Rôle type</th><th>Exemple de périmètre</th></tr><tr><td>Lecteur / auditeur</td><td>Consultation; export seulement s’il est explicitement accordé.</td></tr><tr><td>Agent / opérateur</td><td>Consultation et saisie limitée à son activité.</td></tr><tr><td>Gestionnaire</td><td>Création, modification, affectation et validation selon le métier.</td></tr><tr><td>Admin applicatif</td><td>Administration de son application; ne donne pas l’administration de la plateforme IAM.</td></tr></table>
+  <div class="callout danger"><b>Moindre privilège.</b> Ne pas donner un rôle d’administration pour résoudre un manque de permission ponctuel. Ajouter plutôt la permission exacte au rôle métier concerné.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">14 · Opérations quotidiennes</p>
+  <h2>Groupes, organisations, sessions et audit</h2>
+  <div class="grid-2">
+    <div class="panel pale"><h3>Organisations</h3><ol><li>Créer les niveaux racines.</li><li>Ajouter directions, services et bureaux en choisissant leur parent.</li><li>Rattacher les utilisateurs depuis leur fiche.</li></ol><p class="small">Une organisation utilisée doit être vidée ou ses utilisateurs déplacés avant suppression.</p></div>
+    <div class="panel"><h3>Groupes</h3><ol><li>Ouvrir <b>Groupes → Nouveau groupe</b>.</li><li>Nommer et décrire le groupe.</li><li>Ouvrir <b>Modifier</b> pour choisir ses membres; les groupes peuvent aussi être cochés dans la fiche utilisateur.</li></ol><p class="small">Un groupe organise les personnes; il ne remplace pas un rôle applicatif.</p></div>
+    <div class="panel"><h3>Sessions</h3><p>Filtrer par utilisateur, lire IP/navigateur/activité, puis révoquer une session précise ou toutes les sessions d’un compte.</p></div>
+    <div class="panel warm"><h3>Audit</h3><p>Rechercher par compte, action ou IP. Contrôler les connexions, changements de droits, opérations SSO/OIDC et révocations.</p></div>
+  </div>
+  <h3>Paramètres et MFA</h3>
+  <p><b>Administration → Paramètres</b> permet d’ajuster complexité, historique, expiration du mot de passe, verrouillage et durées de session. <b>E-mail &amp; MFA</b> contient les paramètres de livraison des codes. Sans SMTP fonctionnel, les codes sont visibles en mode de démonstration; ne pas utiliser ce mode en production.</p>
+  <div class="callout warn"><b>Point à connaître.</b> L’état MFA et la règle qui l’impose dépendent de la configuration; la MFA n’est pas un rôle. Un utilisateur peut être autorisé par rôle et néanmoins devoir passer le second facteur avant d’entrer.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">15 · OAuth / OIDC</p>
+  <h2>Configurer une application non-PHP</h2>
+  <p>Ouvrir <b>Administration → OAuth / OIDC → Nouveau client</b> et choisir une plateforme. L’assistant enregistre le client et affiche un récapitulatif de paramètres; il ne modifie pas le code d’un projet externe.</p>
+  <table><tr><th>Choix</th><th>Configuration</th><th>Règle de sécurité</th></tr>
+    <tr><td>Django / serveur web</td><td>Callback HTTPS exacte; Authorization Code; scopes openid/profile/email.</td><td>Secret visible une seule fois, à garder côté serveur.</td></tr>
+    <tr><td>Flutter mobile</td><td>Callback avec schéma de l’application; client public Authorization Code.</td><td>Pas de secret; PKCE S256 est obligatoire.</td></tr>
+    <tr><td>Service API</td><td>Client Credentials; pas de callback ni d’utilisateur interactif.</td><td>Secret côté serveur et scopes machine autorisés.</td></tr>
+  </table>
+  <h3>Paramètres à renseigner dans le connecteur OIDC</h3>
+  <ul><li>Issuer : URL IAM indiquée dans le récapitulatif.</li><li>Découverte : <code>/.well-known/openid-configuration.php</code>.</li><li>Client ID; secret uniquement pour serveur/service confidentiel.</li><li>URI callback exactement identique; scopes autorisés affichés.</li><li>Pour Flutter : redirect scheme exact et PKCE S256; jamais incorporer un secret à l’application.</li></ul>
+  <div class="callout"><b>Test fonctionnel.</b> Lancer le login depuis l’application, approuver le consentement, confirmer le retour à l’URI, vérifier le profil UserInfo puis tester déconnexion et session expirée.</div>
+  <div class="callout warn"><b>Les rôles RBAC ne sont pas encore des claims UserInfo.</b> OIDC renvoie l’identité/profil. Les permissions applicatives doivent être ajoutées à une future extension de claims ou vérifiées via un endpoint adapté.</div>
+</section>
+
+<section class="page">
+  <p class="kicker">16 · Aide-mémoire</p>
+  <h2>Scénario complet et dépannage</h2>
+  <h3>Ouvrir une application de bout en bout</h3>
+  <ol><li>Créer l’application au catalogue et lancer le prédiagnostic.</li><li>Ajouter ses permissions correspondant aux opérations métier réelles.</li><li>Créer des rôles propres à l’application et attacher les permissions.</li><li>Créer les utilisateurs ou les importer; créer l’organisation au préalable si nécessaire.</li><li>Attribuer un rôle à chaque utilisateur dans la bonne application.</li><li>Configurer le garde PHP ou enregistrer un client OIDC adapté.</li><li>Activer l’application, se connecter avec un compte de test à privilèges minimaux.</li><li>Contrôler une action permise, une action interdite et l’événement d’audit correspondant.</li></ol>
+  <table><tr><th>Symptôme</th><th>Cause à vérifier</th><th>Action</th></tr>
+    <tr><td>Application invisible</td><td>Application inactive ou aucun rôle utilisateur.</td><td>Activer après préparation et attribuer le bon rôle.</td></tr>
+    <tr><td>Liste des rôles vide</td><td>Aucun rôle n’appartient à cette application.</td><td>Créer un rôle avec cette application comme propriétaire.</td></tr>
+    <tr><td>Erreur 403 après login</td><td>Permission absente, mauvais rôle ou backend métier qui refuse correctement.</td><td>Vérifier rôle, permission puis contrôle côté serveur.</td></tr>
+    <tr><td>Jeton SSO invalide</td><td>Jeton court déjà utilisé, expiré ou code application différent.</td><td>Repartir du portail pour obtenir un nouveau jeton.</td></tr>
+    <tr><td>Callback OIDC refusé</td><td>URI, port, schéma ou slash final différent.</td><td>Copier exactement l’URI enregistrée dans les deux côtés.</td></tr>
+    <tr><td>Flutter invalid_client</td><td>Client mobile configuré comme confidentiel ou PKCE absent.</td><td>Utiliser profil public, sans secret et PKCE S256.</td></tr>
+    <tr><td>MFA non reçu</td><td>SMTP absent ou erreur de livraison.</td><td>Vérifier E-mail &amp; MFA; le mode démo n’est que local.</td></tr>
+  </table>
+  <div class="callout"><b>Pour diagnostiquer rapidement :</b> séparer authentification (qui est connecté ?), autorisation (quel rôle/permission ?) et intégration (le client a-t-il correctement ouvert sa session ?).</div>
+  <div class="footer-note">Fin du manuel utilisateur et administrateur · Les secrets et mots de passe réels ne doivent jamais figurer dans ce document.</div>
+</section>
+</main>
+</body>
+</html>

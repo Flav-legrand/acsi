@@ -1,0 +1,163 @@
+classDiagram
+    direction LR
+
+    class Organization {
+        +int id
+        +int parent_id
+        +string name
+        +string code
+        +string type
+        +bool active
+    }
+
+    class User {
+        +int id
+        +string username
+        +string email
+        +string password_hash
+        +string status
+        +bool mfa_enabled
+        +bool must_change_password
+        +datetime last_login_at
+    }
+
+    class Group {
+        +int id
+        +string name
+        +string description
+    }
+
+    class UserGroup {
+        +int user_id
+        +int group_id
+    }
+
+    class PasswordHistory {
+        +int id
+        +int user_id
+        +string password_hash
+        +datetime created_at
+    }
+
+    class MfaDevice {
+        +int id
+        +int user_id
+        +string type
+        +string secret
+        +bool verified
+    }
+
+    class OtpCode {
+        +int id
+        +int user_id
+        +string code_hash
+        +datetime expires_at
+        +bool used
+    }
+
+    class Application {
+        +int id
+        +string code
+        +string name
+        +string url
+        +string redirect_uri
+        +bool active
+        +bool sso_prompt
+        +json bridge_config
+    }
+
+    class Role {
+        +int id
+        +int application_id
+        +string name
+        +string code
+        +bool is_system
+    }
+
+    class Permission {
+        +int id
+        +int application_id
+        +string code
+        +string name
+        +string description
+    }
+
+    class UserRole {
+        +int id
+        +int user_id
+        +int role_id
+        +int application_id
+        +datetime created_at
+    }
+
+    class RolePermission {
+        +int role_id
+        +int permission_id
+    }
+
+    class Session {
+        +int id
+        +int user_id
+        +string session_token
+        +datetime expires_at
+        +datetime last_active_at
+        +bool revoked
+    }
+
+    class SsoToken {
+        +int id
+        +int user_id
+        +int application_id
+        +string token
+        +string return_url
+        +datetime expires_at
+        +datetime consumed_at
+    }
+
+    class OAuthClient {
+        +int id
+        +string client_id
+        +string client_secret
+        +string redirect_uris
+        +string scopes
+        +bool active
+    }
+
+    class AuditLog {
+        +int id
+        +int user_id
+        +string action
+        +string application
+        +datetime created_at
+        +string ip_address
+    }
+
+    Organization "0..1" --> "0..*" User : rattachement
+    Organization "0..1" --> "0..*" Organization : parent
+
+    User "1" --> "0..*" UserGroup : appartient
+    Group "1" --> "0..*" UserGroup : contient
+
+    User "1" --> "0..*" UserRole : attribution
+    Role "1" --> "0..*" UserRole : affectation
+    Application "1" --> "0..*" UserRole : périmètre
+    Application "1" --> "0..*" Role : rôles locaux
+    Application "1" --> "0..*" Permission : catalogue
+    Role "1" --> "0..*" RolePermission : droits
+    Permission "1" --> "0..*" RolePermission : accès
+
+    User "1" --> "0..*" Session : sessions
+    User "1" --> "0..*" SsoToken : émet
+    Application "1" --> "0..*" SsoToken : cible
+    User "1" --> "0..*" PasswordHistory : historique
+    User "1" --> "0..*" MfaDevice : facteurs
+    User "1" --> "0..*" OtpCode : codes
+    User "0..1" --> "0..*" AuditLog : acteur
+
+    User "1" --> "0..*" OAuthClient : client OAuth
+
+    note for UserRole "Contrainte métier: un UserRole doit pointer vers un Role de la même application."
+    note for RolePermission "Les permissions sont évaluées côté serveur; le client reçoit uniquement des droits de lecture."
+    note for SsoToken "Jeton à usage unique, courte durée de vie, validation atomique à la consommation."
+
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:1.2px,color:#000000

@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Iam;
+
+/**
+ * Utilisateur connecté via l'IAM, tel que l'IAM l'a décrit au login :
+ * identité, rôles et permissions sur @@NOM_APP@@ (@@CODE_APP@@).
+ *
+ * Règles d'accès (identiques à client/iam_gate.php côté IAM) :
+ *   - « * » (joker)  : toutes les permissions. L'IAM l'accorde au rôle
+ *                      « admin » de l'application et aux administrateurs
+ *                      de la plateforme IAM ;
+ *   - sinon          : la permission doit figurer dans la liste ;
+ *   - lecture seule  : si l'IAM n'a transmis AUCUNE permission, seules
+ *                      les permissions « *.view » sont accordées
+ *                      (désactivable : IAM_READONLY_FALLBACK=false).
+ *                      Accorder l'écriture à une session incomplète
+ *                      serait l'erreur inverse, bien plus grave.
+ */
+final class IamUser
+{
+    public const JOKER = '*';
+
+    /**
+     * @param  array{id:int, username:string, email:string, first_name:string, last_name:string, name:string}  $identity
+     * @param  string[]  $roles
+     * @param  string[]  $permissions
+     */
+    public function __construct(
+        public readonly array $identity,
+        public readonly array $roles,
+        public readonly array $permissions,
+        public readonly string $mode,
+        private readonly bool $readonlyFallback = true,
+    ) {
+    }
+
+    /**
+     * Utilisateur IAM de la requête courante (session ou jeton Bearer),
+     * ou null s'il n'est pas connecté.
+     */
+    public static function current(): ?self
+    {
+        $request = request();
+        $fromRequest = $request?->attributes->get('iam_user');
+        if ($fromRequest instanceof self) {
+            return $fromRequest;
+        }
+        $state = $request?->hasSession() ? $request->session()->get(IamClient::SESSION_KEY) : null;
+
+        return is_array($state)
+            ? self::fromState($state, (bool) config('services.iam.readonly_fallback', true))
+            : null;
+    }
+
+    public static function fromState(array $state, bool $readonlyFallback = true): self
+    {
+        return new self(
+            $state['user'] ?? [],
+            array_values(array_filter((array) ($state['roles'] ?? []), 'strlen')),
+            array_values(array_filter((array) ($state['permissions'] ?? []), 'strlen')),
+            (string) ($state['mode'] ?? 'oidc'),
+            $readonlyFallback,
+        );
+    }
+
+    public function id(): int
+    {
+        return (int) ($this->identity['id'] ?? 0);
+    }
+
+    public function email(): string
+    {
+        return (string) ($this->identity['email'] ?? '');
+    }
+
+    public function name(): string
+    {
+        $name = trim((string) ($this->identity['name'] ?? ''));
+
+        return $name !== '' ? $name : trim(($this->identity['first_name'] ?? '').' '.($this->identity['last_name'] ?? ''));
+    }
+
+    public function hasRole(string ...$codes): bool
+    {
+        return array_intersect($codes, $this->roles) !== [];
+    }
+
+    public function isAppAdmin(): bool
+    {
+        return in_array(self::JOKER, $this->permissions, true);
+    }
+
+    /**
+     * L'utilisateur a-t-il accès à l'application ?
+     * Au moins un rôle sur l'application, ou le joker (administrateur IAM).
+     *
+     * Contrôle indispensable : le point d'autorisation OIDC de l'IAM
+     * délivre un code à tout utilisateur connecté, qu'il ait ou non un
+     * rôle sur cette application.
+     */
+    public function hasAccess(): bool
+    {
+        return $this->roles !== [] || $this->isAppAdmin();
+    }
+
+    /** Possède-t-il AU MOINS UNE de ces permissions ? */
+    public function can(string ...$codes): bool
+    {
+        if (! $this->hasAccess() || $codes === []) {
+            return false;
+        }
+        if ($this->isAppAdmin()) {
+            return true;
+        }
+        if (array_intersect($codes, $this->permissions) !== []) {
+            return true;
+        }
+        if ($this->readonlyFallback && $this->permissions === []) {
+            foreach ($codes as $code) {
+                if (str_ends_with($code, '.view')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** Possède-t-il TOUTES ces permissions ? */
+    public function canAll(string ...$codes): bool
+    {
+        foreach ($codes as $code) {
+            if (! $this->can($code)) {
+                return false;
+            }
+        }
+
+        return $codes !== [];
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'user'        => $this->identity,
+            'roles'       => $this->roles,
+            'permissions' => $this->permissions,
+            'mode'        => $this->mode,
+            'has_access'  => $this->hasAccess(),
+        ];
+    }
+}

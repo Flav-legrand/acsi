@@ -1,0 +1,38 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Iam\Permissions;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+/**
+ * Comptes de test LOCAUX de Gestion des Stages et Emplois, miroirs des comptes déclarés
+ * dans l'IAM (sql/seed-app-stages-emplois.sql).
+ *
+ *   php artisan db:seed --class=IamTestUsersSeeder
+ *
+ * Ces enregistrements permettent de préparer des données métier liées
+ * à users.id avant la première connexion. Ils ne servent PAS à se
+ * connecter : le mot de passe local est aléatoire, l'authentification
+ * passe toujours par l'IAM. À la première connexion, le compte local est
+ * rattaché à l'IAM (colonne iam_sub) grâce à l'adresse e-mail.
+ */
+class IamTestUsersSeeder extends Seeder
+{
+    public function run(): void
+    {
+        foreach (Permissions::TEST_USERS as $account) {
+            $user = User::firstOrNew(['email' => $account['email']]);
+            if (! $user->exists) {
+                $user->password = Hash::make(Str::random(48));
+            }
+            $user->name = $account['name'];
+            $user->save();
+
+            $this->command?->info(sprintf('  %-45s rôle(s) IAM : %s', $account['email'], implode(', ', $account['roles'])));
+        }
+    }
+}

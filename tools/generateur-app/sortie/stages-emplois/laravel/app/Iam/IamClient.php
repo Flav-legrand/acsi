@@ -1,0 +1,405 @@
+<?php
+
+namespace App\Iam;
+
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Throwable;
+
+/**
+ * Client de l'IAM-Local (« IAM ACSI ») pour Gestion des Stages et Emplois.
+ *
+ * Deux voies de connexion :
+ *
+ *   OIDC + PKCE (voie principale)
+ *     oauth.php  →  /callback  →  api/oauth/token.php
+ *     Les jetons sont des JWT RS256 : on les vérifie avec la clé
+ *     PUBLIQUE de l'IAM (api/oauth/jwks.php). Aucun secret de l'IAM
+ *     n'est nécessaire côté Laravel pour les vérifier.
+ *
+ *   SSO maison (option)
+ *     sso/authorize.php  →  /callback/sso  →  api/sso/validate.php
+ *     Le jeton SSO est à usage unique et validé SERVEUR À SERVEUR.
+ *     Le JWT HS256 renvoyé par validate.php n'est PAS vérifié ici
+ *     (il faudrait partager IAM_JWT_SECRET) : on garde en session le
+ *     résultat de l'appel, obtenu directement de l'IAM.
+ *
+ * Généré le 2026-10-13 par tools/generateur-app (pile laravel).
+ */
+class IamClient
+{
+    /** Clé de session qui porte tout l'état IAM. */
+    public const SESSION_KEY = 'iam';
+
+    /** Marge (secondes) tolérée sur exp / iat entre l'IAM et Laravel. */
+    private const LEEWAY = 30;
+
+    public function __construct(private readonly array $config)
+    {
+    }
+
+    /* ==============================================================
+       CONFIGURATION ET POINTS D'ACCÈS
+       ============================================================== */
+
+    public function config(string $key, mixed $default = null): mixed
+    {
+        return $this->config[$key] ?? $default;
+    }
+
+    public function baseUrl(): string
+    {
+        return rtrim((string) $this->config('base_url'), '/');
+    }
+
+    /** URL de l'IAM vue par le SERVEUR Laravel (appels back-channel). */
+    public function internalUrl(): string
+    {
+        return rtrim((string) ($this->config('internal_url') ?: $this->baseUrl()), '/');
+    }
+
+    /** Émetteur attendu dans « iss » : IAM_BASE_URL côté IAM. */
+    public function issuer(): string
+    {
+        return rtrim((string) ($this->config('issuer') ?: $this->baseUrl()), '/');
+    }
+
+    public function appCode(): string
+    {
+        return (string) $this->config('app_code');
+    }
+
+    public function clientId(): string
+    {
+        return (string) $this->config('client_id');
+    }
+
+    public function mode(): string
+    {
+        return $this->config('mode') === 'sso' ? 'sso' : 'oidc';
+    }
+
+    public function endpoint(string $name): string
+    {
+        $paths = [
+            'authorize'     => '/oauth.php',
+            'token'         => '/api/oauth/token.php',
+            'jwks'          => '/api/oauth/jwks.php',
+            'userinfo'      => '/api/oauth/userinfo.php',
+            'logout'        => '/logout.php',
+            'sso_authorize' => '/sso/authorize.php',
+            'sso_validate'  => '/api/sso/validate.php',
+        ];
+        // Le navigateur passe par l'URL publique ; le serveur Laravel
+        // peut passer par une URL interne (conteneur, proxy…).
+        $browser = in_array($name, ['authorize', 'logout', 'sso_authorize'], true);
+
+        return ($browser ? $this->baseUrl() : $this->internalUrl()).$paths[$name];
+    }
+
+    /* ==============================================================
+       OIDC : AUTORISATION + PKCE
+       ============================================================== */
+
+    /**
+     * Prépare la redirection vers l'IAM.
+     *
+     * @return array{url: string, state: string, nonce: string, verifier: string}
+     */
+    public function buildAuthorizationRequest(): array
+    {
+        // 64 caractères [A-Za-z0-9] : conforme au motif exigé par l'IAM
+        // pour code_verifier (43 à 128 caractères non réservés).
+        $verifier = Str::random(64);
+        $state = Str::random(40);
+        $nonce = Str::random(40);
+
+        $query = [
+            'response_type'         => 'code',
+            'client_id'             => $this->clientId(),
+            'redirect_uri'          => (string) $this->config('redirect_uri'),
+            'scope'                 => (string) $this->config('scopes'),
+            'state'                 => $state,
+            'nonce'                 => $nonce,
+            'code_challenge'        => self::pkceChallenge($verifier),
+            'code_challenge_method' => 'S256',
+        ];
+
+        return [
+            'url'      => $this->endpoint('authorize').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986),
+            'state'    => $state,
+            'nonce'    => $nonce,
+            'verifier' => $verifier,
+        ];
+    }
+
+    /** code_challenge = BASE64URL(SHA256(code_verifier)), sans « = » final. */
+    public static function pkceChallenge(string $verifier): string
+    {
+        return rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+    }
+
+    /**
+     * Échange le code d'autorisation contre des jetons.
+     *
+     * @return array<string, mixed> réponse JSON de api/oauth/token.php
+     */
+    public function exchangeCode(string $code, string $verifier): array
+    {
+        return $this->tokenRequest([
+            'grant_type'    => 'authorization_code',
+            'code'          => $code,
+            'redirect_uri'  => (string) $this->config('redirect_uri'),
+            'code_verifier' => $verifier,
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    public function refresh(string $refreshToken): array
+    {
+        return $this->tokenRequest([
+            'grant_type'    => 'refresh_token',
+            'refresh_token' => $refreshToken,
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function tokenRequest(array $form): array
+    {
+        // client_secret_post : identifiants dans le corps. Plus robuste
+        // que l'en-tête Basic, que certains Apache/FastCGI ne
+        // transmettent pas à PHP.
+        $form += [
+            'client_id'     => $this->clientId(),
+            'client_secret' => (string) $this->config('client_secret'),
+        ];
+
+        try {
+            $response = $this->http()->asForm()->post($this->endpoint('token'), $form);
+        } catch (ConnectionException $e) {
+            throw new IamException("IAM injoignable ({$this->endpoint('token')}) : ".$e->getMessage(), previous: $e);
+        }
+
+        $data = $response->json();
+        if (! $response->successful() || ! is_array($data) || empty($data['access_token'])) {
+            $error = is_array($data) ? ($data['error_description'] ?? $data['error'] ?? '') : '';
+            throw new IamException("Échange de jeton refusé par l'IAM (HTTP {$response->status()}) : {$error}");
+        }
+
+        return $data;
+    }
+
+    /* ==============================================================
+       VÉRIFICATION DES JWT (RS256, clé publique JWKS)
+       ============================================================== */
+
+    /**
+     * Vérifie un JWT émis par l'IAM et renvoie ses claims.
+     *
+     * Contrôles : signature RS256 (clé publique, kid), exp/iat,
+     * iss = émetteur IAM, aud = client_id de cette application,
+     * et nonce si fourni (id_token).
+     *
+     * @return array<string, mixed>
+     */
+    public function verifyJwt(string $jwt, ?string $expectedNonce = null): array
+    {
+        JWT::$leeway = self::LEEWAY;
+
+        try {
+            $claims = (array) JWT::decode($jwt, $this->keySet());
+        } catch (\UnexpectedValueException $e) {
+            // « kid » inconnu : l'IAM a peut-être fait une rotation de clé
+            // (Administration > Applications OAuth / OIDC > Rotation JWKS).
+            // On recharge le JWKS UNE fois avant de conclure.
+            if (! str_contains($e->getMessage(), 'kid')) {
+                throw new IamException('Jeton IAM invalide : '.$e->getMessage(), previous: $e);
+            }
+            try {
+                $claims = (array) JWT::decode($jwt, $this->keySet(refresh: true));
+            } catch (Throwable $e2) {
+                throw new IamException('Jeton IAM invalide : '.$e2->getMessage(), previous: $e2);
+            }
+        } catch (Throwable $e) {
+            throw new IamException('Jeton IAM invalide : '.$e->getMessage(), previous: $e);
+        }
+
+        $claims = json_decode(json_encode($claims), true);
+
+        if (rtrim((string) ($claims['iss'] ?? ''), '/') !== $this->issuer()) {
+            throw new IamException("Émetteur inattendu : « ".($claims['iss'] ?? '')." » (attendu « {$this->issuer()} »).");
+        }
+        $aud = (array) ($claims['aud'] ?? []);
+        if (! in_array($this->clientId(), $aud, true)) {
+            throw new IamException("Jeton destiné à une autre application (aud = ".implode(',', $aud).').');
+        }
+        if ($expectedNonce !== null && ! hash_equals($expectedNonce, (string) ($claims['nonce'] ?? ''))) {
+            throw new IamException('Nonce invalide : réponse rejouée ou détournée.');
+        }
+
+        return $claims;
+    }
+
+    /** Clés publiques de l'IAM, mises en cache. */
+    private function keySet(bool $refresh = false): array
+    {
+        $cacheKey = 'iam.jwks.'.md5($this->endpoint('jwks'));
+        if ($refresh) {
+            Cache::forget($cacheKey);
+        }
+
+        $jwks = Cache::remember($cacheKey, (int) $this->config('jwks_cache_ttl', 3600), function () {
+            $response = $this->http()->get($this->endpoint('jwks'));
+            $data = $response->json();
+            if (! $response->successful() || empty($data['keys'])) {
+                throw new IamException("JWKS de l'IAM indisponible ({$this->endpoint('jwks')}).");
+            }
+
+            return $data;
+        });
+
+        return JWK::parseKeySet($jwks, 'RS256');
+    }
+
+    /* ==============================================================
+       SSO MAISON (option)
+       ============================================================== */
+
+    public function ssoAuthorizeUrl(string $returnUrl, bool $prompt = false): string
+    {
+        $query = ['app' => $this->appCode(), 'return' => $returnUrl];
+        if ($prompt) {
+            $query['prompt'] = 'login';
+        }
+
+        return $this->endpoint('sso_authorize').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    /**
+     * Valide un jeton SSO à usage unique, serveur à serveur.
+     *
+     * @return array<string, mixed> réponse JSON de api/sso/validate.php
+     */
+    public function validateSsoToken(string $token): array
+    {
+        try {
+            $response = $this->http()->asJson()->post($this->endpoint('sso_validate'), [
+                'token'    => $token,
+                'app_code' => $this->appCode(),
+            ]);
+        } catch (ConnectionException $e) {
+            throw new IamException("IAM injoignable ({$this->endpoint('sso_validate')}) : ".$e->getMessage(), previous: $e);
+        }
+
+        $data = $response->json();
+        if (! $response->successful() || empty($data['success']) || empty($data['user']['id'])) {
+            throw new IamException('Jeton SSO refusé : '.($data['error'] ?? "HTTP {$response->status()}"));
+        }
+
+        return $data;
+    }
+
+    /* ==============================================================
+       DÉCONNEXION
+       ============================================================== */
+
+    /**
+     * URL de déconnexion de l'IAM (RP-initiated logout).
+     * logout.php ne redirige vers post_logout_redirect_uri que si
+     * cette URI est enregistrée pour le client (post_logout_uris).
+     */
+    public function logoutUrl(?string $state = null): string
+    {
+        $query = [
+            'client_id'                => $this->clientId(),
+            'post_logout_redirect_uri' => (string) $this->config('post_logout_redirect_uri'),
+        ];
+        if ($state !== null) {
+            $query['state'] = $state;
+        }
+
+        return $this->endpoint('logout').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    /* ==============================================================
+       SESSION
+       ============================================================== */
+
+    /**
+     * État IAM normalisé à partir de jetons OIDC vérifiés.
+     *
+     * @param  array<string, mixed>  $tokens  réponse de /token
+     * @param  array<string, mixed>  $idClaims  claims de l'id_token
+     * @param  array<string, mixed>  $accessClaims  claims de l'access_token
+     */
+    public function stateFromOidc(array $tokens, array $idClaims, array $accessClaims): array
+    {
+        return [
+            'mode'          => 'oidc',
+            'user'          => [
+                'id'         => (int) ($idClaims['sub'] ?? $accessClaims['sub'] ?? 0),
+                'username'   => (string) ($idClaims['preferred_username'] ?? ''),
+                'email'      => (string) ($idClaims['email'] ?? ''),
+                'first_name' => (string) ($idClaims['given_name'] ?? ''),
+                'last_name'  => (string) ($idClaims['family_name'] ?? ''),
+                'name'       => (string) ($idClaims['name'] ?? ''),
+            ],
+            // Les droits de référence sont ceux de l'ACCESS token : c'est
+            // lui qui est renouvelé et revérifié à chaque requête.
+            'roles'         => array_values(array_map('strval', (array) ($accessClaims['roles'] ?? $idClaims['roles'] ?? []))),
+            'permissions'   => array_values(array_map('strval', (array) ($accessClaims['permissions'] ?? $idClaims['permissions'] ?? []))),
+            'access_token'  => (string) $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'] ?? null,
+            'id_token'      => $tokens['id_token'] ?? null,
+            'expires_at'    => (int) ($accessClaims['exp'] ?? (time() + (int) ($tokens['expires_in'] ?? 3600))),
+            'logged_in_at'  => time(),
+        ];
+    }
+
+    /** État IAM normalisé à partir de la réponse de validate.php. */
+    public function stateFromSso(array $data): array
+    {
+        $u = $data['user'];
+
+        return [
+            'mode'          => 'sso',
+            'user'          => [
+                'id'         => (int) $u['id'],
+                'username'   => (string) ($u['username'] ?? ''),
+                'email'      => (string) ($u['email'] ?? ''),
+                'first_name' => (string) ($u['first_name'] ?? ''),
+                'last_name'  => (string) ($u['last_name'] ?? ''),
+                'name'       => (string) ($u['full_name'] ?? trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? ''))),
+            ],
+            // validate.php renvoie des objets {id, name, code} : on ne garde que les codes.
+            'roles'         => array_values(array_map(
+                static fn ($r) => is_array($r) ? (string) ($r['code'] ?? '') : (string) $r,
+                (array) ($data['roles'] ?? [])
+            )),
+            'permissions'   => array_values(array_map('strval', (array) ($data['permissions'] ?? []))),
+            'access_token'  => null,
+            'refresh_token' => null,
+            'id_token'      => null,
+            // Pas de jeton vérifiable : la session locale expire d'elle-même.
+            'expires_at'    => time() + (int) $this->config('sso_session_ttl', 28800),
+            'logged_in_at'  => time(),
+        ];
+    }
+
+    public function http(): \Illuminate\Http\Client\PendingRequest
+    {
+        return Http::timeout((int) $this->config('http_timeout', 10))
+            ->acceptJson()
+            ->withOptions(['verify' => (bool) $this->config('verify_tls', true)]);
+    }
+
+    public static function log(string $message, array $context = []): void
+    {
+        Log::channel(config('logging.default'))->info('[IAM] '.$message, $context);
+    }
+}

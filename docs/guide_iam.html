@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>IAM-Local — Guide d'utilisation</title>
+<style>
+  :root{
+    --primary:#4361ee; --primary-dark:#3653c4; --dark:#1e293b; --muted:#64748b;
+    --bg:#f8fafc; --border:#e2e8f0; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#1e293b;font-size:13px;line-height:1.55;}
+  /* ---------- COUVERTURE ---------- */
+  .cover{height:100vh;background:linear-gradient(135deg,#1e3a8a 0%,#4361ee 55%,#7c3aed 100%);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;page-break-after:always;}
+  .cover .shield{font-size:80px;margin-bottom:16px;}
+  .cover h1{font-size:44px;margin:0 0 8px;letter-spacing:1px;}
+  .cover p.sub{font-size:20px;opacity:.9;margin:0 0 40px;}
+  .cover .meta{font-size:13px;opacity:.85;line-height:1.8;}
+  .cover .pill{display:inline-block;border:1px solid rgba(255,255,255,.6);border-radius:20px;padding:2px 14px;font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.85;}
+
+  /* ---------- STRUCTURE ---------- */
+  .page{page-break-after:always;}
+  h1{font-size:24px;color:var(--primary);border-bottom:3px solid var(--primary);padding-bottom:6px;margin:0 0 18px;}
+  h2{font-size:17px;color:var(--dark);margin:22px 0 10px;border-left:4px solid var(--primary);padding-left:8px;}
+  h3{font-size:14px;margin:16px 0 6px;color:#334155;}
+  p{margin:6px 0;}
+  ul,ol{margin:6px 0 6px 0;padding-left:22px;}
+  li{margin:3px 0;}
+  code{background:#eef2ff;border:1px solid #c7d2fe;border-radius:4px;padding:1px 5px;font-family:Consolas,'Courier New',monospace;font-size:12px;}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:12px;overflow:auto;font-family:Consolas,'Courier New',monospace;font-size:12px;line-height:1.5;}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:12px;}
+  th{background:var(--primary);color:#fff;text-align:left;padding:7px 9px;font-weight:600;}
+  td{border:1px solid var(--border);padding:6px 9px;vertical-align:top;}
+  tr:nth-child(even) td{background:#f1f5f9;}
+  .callout{border-radius:6px;padding:10px 14px;margin:10px 0;font-size:12.5px;}
+  .info{background:#eff6ff;border:1px solid #bfdbfe;}
+  .warn{background:#fffbeb;border:1px solid #fde68a;}
+  .ok{background:#f0fdf4;border:1px solid #bbf7d0;}
+  .err{background:#fef2f2;border:1px solid #fecaca;}
+  .badge{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:1px 10px;font-size:11px;font-weight:600;}
+  .badge-green{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
+  .badge-warn{background:#fffbeb;border-color:#fde68a;color:#92400e;}
+  .badge-red{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+  .steps{counter-reset:step;list-style:none;padding-left:0;}
+  .steps li{counter-increment:step;position:relative;padding:6px 0 6px 38px;border-left:2px solid var(--border);margin-left:14px;}
+  .steps li::before{content:counter(step);position:absolute;left:-14px;top:6px;width:26px;height:26px;background:var(--primary);color:#fff;border-radius:50%;text-align:center;line-height:26px;font-weight:700;font-size:12px;}
+  .toc a{color:var(--dark);text-decoration:none;}
+  .toc a:hover{color:var(--primary);}
+  .toc li{margin:5px 0;}
+  .kv{font-size:12.5px;}
+  .kv b{display:inline-block;min-width:190px;}
+  .footer-note{font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--border);padding-top:8px;margin-top:20px;}
+  .uml-page{page:uml;page-break-before:always;page-break-after:always;}
+  .uml-page .mermaid{background:#fff;padding:8px;}
+  @page uml{size:A4 landscape;margin:12mm;}
+</style>
+</head>
+<body>
+
+<!-- ================= COUVERTURE ================= -->
+<div class="cover">
+  <div class="shield">&#128737;</div>
+  <h1>IAM-Local</h1>
+  <p class="sub">Guide d'administration &amp; d'utilisation</p>
+  <div style="margin-bottom:34px;">
+    <span class="pill">Identity &amp; Access Management</span>
+    <span class="pill">SSO</span>
+    <span class="pill">v1.1.0</span>
+  </div>
+  <div class="meta">
+    <b>Gestion des utilisateurs, applications, rôles, permissions<br>
+    intégration SSO automatique, audit et sécurité</b><br><br>
+    Documentation utilisateur — Octobre 2026
+  </div>
+</div>
+
+<!-- ================= SOMMAIRE ================= -->
+<div class="page">
+  <h1>Sommaire</h1>
+  <ol class="toc" style="font-size:14px;">
+    <li><a href="#s1">1. Qu'est-ce que IAM-Local ?</a></li>
+    <li><a href="#s2">2. Installation de la plateforme</a></li>
+    <li><a href="#s2b">2b. Compte initial et accès</a></li>
+    <li><a href="#s3">3. Première connexion</a></li>
+    <li><a href="#s4">4. Le portail « Mes applications »</a></li>
+    <li><a href="#s5">5. La console d'administration</a></li>
+    <li><a href="#s6">6. Gestion des utilisateurs</a></li>
+    <li><a href="#s7">7. Gestion des applications &amp; intégration SSO automatique</a></li>
+    <li><a href="#s8">8. Rôles &amp; permissions</a></li>
+    <li><a href="#s9">9. Organisations</a></li>
+    <li><a href="#s10">10. Sessions utilisateurs</a></li>
+    <li><a href="#s11">11. Journal d'audit</a></li>
+    <li><a href="#s12">12. Paramètres — politique de mot de passe</a></li>
+    <li><a href="#s13">13. Mon profil (espace utilisateur)</a></li>
+    <li><a href="#s14">14. Authentification à deux facteurs (MFA)</a></li>
+    <li><a href="#s15">15. Fonctionnement du SSO (technique)</a></li>
+    <li><a href="#s16">16. Bonnes pratiques &amp; dépannage</a></li>
+    <li><a href="#s17">17. Diagramme UML de classes</a></li>
+    <li><a href="#s18">18. Diagramme UML d'activité</a></li>
+  </ol>
+</div>
+
+<!-- ================= 1. PRESENTATION ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s1">1. Qu'est-ce que IAM-Local ?</h1>
+  <p><b>IAM-Local</b> est une plateforme PHP d'<b>identité et de contrôle d'accès</b> (Identity &amp; Access Management) pensée pour un environnement d'évaluation local (WAMP / XAMPP). Elle centralise :</p>
+  <ul>
+    <li>les <b>comptes utilisateurs</b> (identités) ;</li>
+    <li>les <b>applications</b> protégées par authentification unique (<b>SSO</b>) ;</li>
+    <li>les <b>rôles</b> et <b>permissions</b> par application ;</li>
+    <li>les <b>organisations</b> (hiérarchie ministère → direction → service) ;</li>
+    <li>la <b>politique de mots de passe</b>, les <b>sessions</b> et le <b>journal d'audit</b>.</li>
+  </ul>
+
+  <h2>1.1 Vocabulaire essentiel</h2>
+  <table>
+    <tr><th style="width:25%">Terme</th><th>Définition</th></tr>
+    <tr><td><b>Identité</b></td><td>Compte d'un utilisateur (nom, e-mail, identifiant, matricule...).</td></tr>
+    <tr><td><b>Application</b></td><td>Système tiers (ex. « Gestion des Présences ») protégé par l'IAM.</td></tr>
+    <tr><td><b>SSO</b></td><td>Authentification unique : une seule connexion IAM donne accès à toutes les applications autorisées.</td></tr>
+    <tr><td><b>Rôle</b></td><td>Regroupement de permissions (ex. « Directeur », « Agent », « Auditeur »).</td></tr>
+    <tr><td><b>Permission</b></td><td>Droit précis dans une application (ex. <code>salary.validate</code>, <code>presence.record</code>).</td></tr>
+    <tr><td><b>Organisation</b></td><td>Structure hiérarchique (ministère, direction, service, bureau) à laquelle les utilisateurs sont rattachés.</td></tr>
+    <tr><td><b>Garde SSO</b></td><td>Fichier généré automatiquement par l'IAM qui protège les pages d'une application.</td></tr>
+  </table>
+
+  <h2>1.2 Deux espaces distincts</h2>
+  <div class="info callout">&#8505;&#65039; IAM-Local sépare l'<b>espace utilisateur</b> (portail, profil) de la <b>console d'administration</b> (réservée au rôle <span class="badge">admin</span>).</div>
+  <table>
+    <tr><th>Espace</th><th>Accès</th><th>Contenu</th></tr>
+    <tr><td><b>Portail utilisateur</b></td><td>Tout utilisateur connecté</td><td>Mes applications, mon profil, changement de mot de passe, sessions.</td></tr>
+    <tr><td><b>Console d'administration</b></td><td>Rôle « admin » uniquement</td><td>Tableau de bord, utilisateurs, rôles, applications, organisations, sessions, audit, paramètres.</td></tr>
+  </table>
+</div>
+
+<div class="page" style="page-break-before:always;">
+  <h1 id="s2b">2b. Compte initial et accès</h1>
+  <div class="warn callout">&#9888;&#65039; Le mot de passe initial est affiché une seule fois à la fin de l'installation. Il n'est pas inclus dans ce guide : conservez-le dans un gestionnaire de mots de passe et changez-le à la première connexion.</div>
+  <p>Les comptes de démonstration dépendent des données chargées dans la base. Consultez <b>Administration → Utilisateurs</b> pour vérifier les comptes existants, leur état et leurs rôles; n'utilisez pas un compte de démonstration en production.</p>
+  <h2>Accès aux consoles</h2>
+  <table>
+    <tr><th style="width:40%">Ressource</th><th>Adresse</th></tr>
+    <tr><td>Page de connexion IAM</td><td><code>http://localhost/IAM-Local/login.php</code></td></tr>
+    <tr><td>Portail utilisateur</td><td><code>http://localhost/IAM-Local/portal.php</code></td></tr>
+    <tr><td>Console d'administration</td><td><code>http://localhost/IAM-Local/admin/</code> (rôle admin requis)</td></tr>
+    <tr><td>Application Gestion des Présences</td><td><code>http://localhost/GestionPresnceAdenIAM/</code></td></tr>
+    <tr><td>Application Gestion des Salaires</td><td><code>http://localhost/GestionSalaireAden/</code></td></tr>
+  </table>
+  <div class="info callout">&#8505;&#65039; L'administrateur de la plateforme ouvre la console à <code>http://localhost/IAM-Local/admin/</code>. Les autres utilisateurs accèdent uniquement aux applications pour lesquelles un rôle leur a été attribué.</div>
+</div>
+
+  <!-- ================= 2. INSTALLATION ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s2">2. Installation de la plateforme</h1>
+
+  <h2>2.1 Prérequis</h2>
+  <ul>
+    <li>Serveur web <b>Apache</b> + <b>PHP 8.x</b> (WAMP, XAMPP) avec extensions <code>pdo_mysql</code>, <code>mbstring</code>, <code>openssl</code>.</li>
+    <li>Serveur <b>MySQL 8</b> (port 3306 par défaut).</li>
+    <li>La plateforme copiée dans le dossier web (ex. <code>htdocs/IAM-Local</code> ou <code>www/IAM-Local</code>).</li>
+  </ul>
+
+  <h2>2.2 Déroulement</h2>
+  <p>Avec Apache lancé, la plateforme redirige automatiquement vers <code>install.php</code> tant qu'elle n'est pas installée (présence du fichier <code>.installed</code>).</p>
+  <ol class="steps">
+    <li><b>Informations de plateforme</b> : nom de la plateforme (ex. « IAM-Local ») et URL de base auto-détectée (ex. <code>http://localhost/IAM-Local</code>).</li>
+    <li><b>Connexion MySQL</b> : hôte (ex. <code>localhost</code>), port (<code>3306</code>), utilisateur (ex. <code>root</code>), mot de passe, nom de la base (ex. <code>iam_local</code>). La base et son schéma sont créés automatiquement.</li>
+    <li><b>Compte administrateur</b> : nom, prénom, identifiant, e-mail, matricule. Le <b>mot de passe initial</b> peut être laissé vide : il sera généré automatiquement au format <code>Admin@XXXX</code>. Il est <u>obligatoire de le changer à la première connexion</u>.</li>
+    <li>Case « Données de démonstration (ADEN, Présences/Salaires) » cochée par défaut : ajoute les applications et rôles d'exemple.</li>
+    <li>Cliquer sur <b>Installer</b>.</li>
+  </ol>
+
+  <div class="warn callout">&#9888;&#65039; À la fin de l'installation, l'écran affiche les identifiants de l'administrateur <b>en clair</b> : copiez-les immédiatement. Le mot de passe devra être changé au premier accès.</div>
+
+  <h2>2.3 Réinstallation / mise à jour</h2>
+  <p>Sur l'écran « Déjà installé », le bouton <b>Réinstaller / mettre à jour</b> (<code>install.php?reset=1</code>) ré-exécute l'installation de façon <b>idempotente</b> : le schéma et les données sont mis à jour sans destruction. Un nouveau secret JWT est généré, ce qui invalide les jetons précédents.</p>
+
+  <h2>2.4 Vérification des fichiers</h2>
+  <pre>IAM-Local/
+  .installed          <- marqueur d'installation
+  config/config.php   <- configuration & secret JWT
+  install.php         <- installateur
+  login.php, mfa.php  <- connexion, 2 facteurs
+  portal.php          <- portail utilisateur
+  profile.php         <- profil / mot de passe
+  admin/              <- console d'administration
+  api/                <- API JSON (login, userinfo, sso/validate...)
+  client/             <- bibliothèque SSO pour applications externes</pre>
+</div>
+
+<!-- ================= 3. PREMIERE CONNEXION ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s3">3. Première connexion</h1>
+  <ol class="steps">
+    <li>Ouvrir <code>http://localhost/IAM-Local/login.php</code>.</li>
+    <li>Saisir l'<b>adresse e-mail</b>, l'<b>identifiant</b> ou le <b>numéro de téléphone</b> du compte, puis le <b>mot de passe</b>.</li>
+    <li>Cliquer sur <b>Se connecter</b>.</li>
+    <li>Si c'est un premier accès (<code>must_change_password</code>), la plateforme force le changement de mot de passe via <b>Mon profil → Changer le mot de passe</b>.</li>
+    <li>Vous arrivez sur le <b>portail des applications</b>.</li>
+  </ol>
+
+  <h2>3.1 Règles de connexion (sécurité)</h2>
+  <table>
+    <tr><th style="width:45%">Règle</th><th>Valeur par défaut</th></tr>
+    <tr><td>Longueur minimale du mot de passe</td><td>8 caractères</td></tr>
+    <tr><td>Complexité exigée</td><td>majuscule, minuscule, chiffre, caractère spécial</td></tr>
+    <tr><td>Verrouillage après échecs successifs</td><td>5 échecs → verrouillage 30 min</td></tr>
+    <tr><td>Expiration du mot de passe</td><td>90 jours</td></tr>
+    <tr><td>Historique mémorisé</td><td>5 derniers mots de passe (non réutilisables)</td></tr>
+    <tr><td>Durée de session</td><td>1 h (3600 s)</td></tr>
+    <tr><td>Inactivité avant déconnexion</td><td>30 min (1800 s)</td></tr>
+  </table>
+
+  <h2>3.2 Messages d'erreur courants</h2>
+  <table>
+    <tr><th style="width:50%">Message</th><th>Signification</th></tr>
+    <tr><td>Identifiants incorrects.</td><td>E-mail/login ou mot de passe erroné.</td></tr>
+    <tr><td>Compte désactivé ou en attente de validation.</td><td>Statut du compte <code>inactive</code> ou <code>pending</code>.</td></tr>
+    <tr><td>Compte temporairement verrouillé.</td><td>Verrouillage en cours (déverrouillage automatique après la durée prévue).</td></tr>
+    <tr><td>Trop de tentatives. Réessayez plus tard.</td><td>Limite anti force brute franchie.</td></tr>
+    <tr><td>Session expirée. Réessayez.</td><td>Jeton de sécurité (CSRF) de la page expiré → rechargez la page.</td></tr>
+  </table>
+
+  <h2>3.3 Connexion sans mot de passe (OTP)</h2>
+  <p>Depuis la page de connexion, le lien <b>« Se connecter sans mot de passe »</b> ouvre <code>otp_login.php</code> :</p>
+  <ol class="steps">
+    <li>Saisir son <b>adresse e-mail</b> ou son <b>numéro de téléphone</b> puis cliquer <b>Recevoir mon code</b>.</li>
+    <li>Saisir le <b>code à usage unique</b> reçu par e-mail (valable 5 minutes, 5 essais max).</li>
+    <li>Après vérification, la session est ouverte (le mot de passe n'est pas saisi).</li>
+    <li>Code perdu ? Clien sur <b>« Renvoyer le code »</b> (<code>?resend=1</code>).</li>
+  </ol>
+  <div class="info callout">&#8505;&#65039; Ce mode est utile pour les comptes dont le mot de passe est oublié ou sur mobile, sans passer par l'administrateur. Les comptes peuvent aussi être verrouillés (comme pour une connexion classique) après trop d'échecs.</div>
+</div>
+
+<!-- ================= 4. PORTAL ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s4">4. Le portail « Mes applications »</h1>
+  <p>Après connexion, le portail liste les applications accessibles à l'utilisateur selon ses rôles :</p>
+  <ul>
+    <li>chaque application est présentée sous forme de <b>carte</b> (icône colorée, nom, description, code) ;</li>
+    <li>le bouton <b>Accéder</b> lance la connexion SSO et ouvre l'application ;</li>
+    <li>un bloc <b>Mes rôles</b> affiche tous les rôles attribués.</li>
+  </ul>
+
+  <div class="info callout">&#8505;&#65039; Si l'utilisateur doit changer son mot de passe, un bandeau d'avertissement apparaît et l'accès est suspendu tant que le mot de passe n'est pas modifié.</div>
+
+  <h2>4.1 En-tête et navigation</h2>
+  <ul>
+    <li><b>Avatar + nom + e-mail</b> : lien vers <b>Mon profil</b>.</li>
+    <li><b>Déconnexion</b> : clôture la session (révoquée en base, journal d'audit).</li>
+    <li>La section de navigation « Administration » n'apparaît <b>que pour les administrateurs</b>.</li>
+  </ul>
+
+  <h2>4.2 Accéder à une application</h2>
+  <ol class="steps">
+    <li>Cliquer sur <b>Accéder</b> sur la carte de l'application.</li>
+    <li>L'IAM vérifie que le compte a bien un rôle sur cette application (sinon refus).</li>
+    <li>L'IAM émet un <b>jeton temporaire</b> et redirige l'utilisateur vers l'application.</li>
+    <li>L'application crée sa propre session : l'utilisateur est connecté sans ressaisir son mot de passe.</li>
+  </ol>
+  <p>L'accès <b>direct</b> à l'URL d'une application protégée (sans passer par le portail) fonctionne aussi : l'application protégée redirige automatiquement vers la page de connexion IAM puis ramène l'utilisateur sur la page demandée.</p>
+</div>
+
+<!-- ================= 5. CONSOLE ADMIN ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s5">5. La console d'administration</h1>
+  <p>Accessible uniquement aux utilisateurs ayant le rôle <code>admin</code>. La barre latérale donne accès à 10 rubriques :</p>
+
+  <table>
+    <tr><th style="width:30%">Rubrique</th><th style="width:28%">Fichier</th><th>Rôle</th></tr>
+    <tr><td>Tableau de bord</td><td><code>admin/index.php</code></td><td>Statistiques globales (utilisateurs, comptes actifs, applications, rôles, sessions actives, MFA, événements), utilisateurs par application, dernières connexions.</td></tr>
+    <tr><td>Utilisateurs</td><td><code>admin/users.php</code></td><td>Créer, modifier, supprimer, réinitialiser les mots de passe, attribuer rôles/apps, importer en CSV, gérer direction/service/fonction et groupes.</td></tr>
+    <tr><td>Groupes</td><td><code>admin/groups.php</code></td><td>Créer des annuaires de groupes et gérer leurs membres.</td></tr>
+    <tr><td>OAuth / OIDC</td><td><code>admin/oauth.php</code></td><td>Créer/modifier les clients OAuth 2.0, afficher le secret une seule fois, autoriser les URIs de redirection et réaliser la rotation de la clé de signature.</td></tr>
+    <tr><td>Rôles &amp; permissions</td><td><code>admin/roles.php</code></td><td>Créer des rôles, attacher des permissions par application.</td></tr>
+    <tr><td>Applications</td><td><code>admin/apps.php</code></td><td>Créer/modifier des applications, gérer les permissions, les accès utilisateurs et le déploiement SSO.</td></tr>
+    <tr><td>Organisations</td><td><code>admin/organizations.php</code></td><td>Construire l'arbre organisationnel et rattacher les utilisateurs.</td></tr>
+    <tr><td>Sessions</td><td><code>admin/sessions.php</code></td><td>Lister, filtrer et révoquer les sessions actives.</td></tr>
+    <tr><td>Journal d'audit</td><td><code>admin/audit.php</code></td><td>Consulter tous les événements (connexions, créations, modifications...).</td></tr>
+    <tr><td>Paramètres</td><td><code>admin/settings.php</code></td><td>Configurer la politique de mots de passe.</td></tr>
+  </table>
+
+  <div class="warn callout">&#9888;&#65039; La console est réservée au rôle <code>admin</code> attribué à l'application <code>iam-admin</code>. Un rôle <code>admin</code> métier ne donne pas l'administration de la plateforme.</div>
+</div>
+
+<!-- ================= 6. UTILISATEURS ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s6">6. Gestion des utilisateurs</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Utilisateurs</b>. La liste affiche : utilisateur (nom + e-mail), matricule, organisation, rôles par application, statut, badge MFA, dernière connexion et les actions.</p>
+  <ul>
+    <li><b>Recherche</b> : champ en haut de page (nom, e-mail, matricule).</li>
+    <li><b>Pagination</b> : 15 utilisateurs par page.</li>
+    <li><b>Bouton « Nouvel utilisateur »</b> : ouvre la fenêtre de création.</li>
+  </ul>
+
+  <h2>6.1 Créer un utilisateur</h2>
+  <ol class="steps">
+    <li>Cliquer sur <b>Nouvel utilisateur</b>.</li>
+    <li>Renseigner : <b>Prénom</b>*, <b>Nom</b>*, <b>E-mail</b>* (obligatoires), <b>Téléphone</b>, <b>Identifiant (login)</b> (vide = e-mail), <b>Matricule</b>, <b>Organisation</b>, <b>Direction / Service / Fonction</b>.</li>
+    <li>Saisir un <b>Mot de passe temporaire</b>* respectant la politique (min. 8 caractères + majuscule + chiffre + spécial).</li>
+    <li>Dans <b>Rôles par application</b>, choisir un rôle pour chaque application concernée (option « — Aucun — » possible).</li>
+    <li>Cocher les <b>Groupes</b> éventuels dans la liste à cocher.</li>
+    <li>Cliquer sur <b>Créer</b>.</li>
+  </ol>
+  <div class="info callout">&#8505;&#65039; À la création, le compte est créé avec le drapeau <b>« changer le mot de passe à la prochaine connexion »</b>. C'est l'utilisateur qui choisira son propre mot de passe.</div>
+
+  <h2>6.2 Modifier un utilisateur</h2>
+  <ul>
+    <li>Clic sur l'icône <b>&#9997;&#65039; crayon</b> d'une ligne.</li>
+    <li>Modifier prénom, nom, e-mail, téléphone, matricule, organisation, <b>direction/service/fonction</b>, <b>groupes</b> et <b>statut</b> (<span class="badge badge-green">active</span>, <span class="badge badge-warn">inactive</span>, <span class="badge badge-red">locked</span>).</li>
+    <li>Ajuster les <b>rôles par application</b>.</li>
+    <li>Cliquer sur <b>Enregistrer</b>. Les rôles sont remplacés par la nouvelle sélection.</li>
+  </ul>
+
+  <h2>6.3 Réinitialiser le mot de passe</h2>
+  <ul>
+    <li>Clic sur l'icône <b>&#128273; clé</b> d'une ligne.</li>
+    <li>Saisir un <b>nouveau mot de passe</b> respectant la politique.</li>
+    <li>Cliquer sur <b>Réinitialiser</b>. L'utilisateur devra le changer à sa prochaine connexion.</li>
+  </ul>
+
+  <h2>6.4 Supprimer un utilisateur</h2>
+  <ul>
+    <li>Clic sur l'icône <b>&#128465; corbeille</b> (avec confirmation).</li>
+    <li>L'administrateur principal (id 1) ne peut <b>pas</b> être supprimé.</li>
+  </ul>
+
+  <h2>6.5 Import CSV</h2>
+  <p>Dans la liste des utilisateurs, le bouton <b>« Importer »</b> ouvre une fenêtre : téléchargez le <b>modèle CSV</b>
+  (bouton « Télécharger le modèle »), remplissez-le puis importez-le. Règles :</p>
+  <ul>
+    <li>Utilisez le modèle fourni par le bouton <b>Télécharger le modèle CSV</b>. Les en-têtes sont : <code>email</code>, <code>first_name</code>, <code>last_name</code>, puis les champs facultatifs <code>username</code>, <code>phone</code>, <code>matricule</code>, <code>organization</code>, <code>department</code>, <code>service</code>, <code>fonction</code> et <code>status</code>.</li>
+    <li>Le séparateur point-virgule ou virgule est détecté automatiquement; l'encodage UTF-8 avec BOM est accepté. E-mail, prénom et nom sont obligatoires.</li>
+    <li>Les e-mails déjà utilisés sont ignorés. Les lignes incomplètes sont signalées; l'organisation est recherchée par code ou nom.</li>
+    <li>Un mot de passe aléatoire est créé et le changement au prochain accès est exigé. Distribuez les accès par un canal sûr.</li>
+  </ul>
+
+  <h2>6.6 Gérer les groupes</h2>
+  <p>Menu <span class="badge">Administration</span> → <b>Groupes</b> : créer, renommer ou supprimer des groupes
+  (annuaires transverses, ex. « Encadrement », « Commission ») et gérer leurs membres. Les groupes sélectionnés
+  dans un utilisateur apparaissent aussi dans les formulaires de création/modification (« Groupes »).</p>
+
+  <div class="ok callout">&#9989; Toutes ces opérations sont tracées dans le <b>journal d'audit</b> (<code>user_created</code>, <code>user_updated</code>, <code>user_deleted</code>, <code>password_reset</code>).</div>
+</div>
+
+<!-- ================= 7. APPLICATIONS ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s7">7. Gestion des applications &amp; intégration SSO automatique</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Applications</b>. Chaque application est présentée par une <b>carte</b> : icône colorée, nom, description, URL, badges d'état et boutons d'action.</p>
+
+  <h2>7.1 Créer une application</h2>
+  <ol class="steps">
+    <li>Cliquer sur <b>Enregistrer une application</b>.</li>
+    <li>Renseigner les champs :
+      <table>
+        <tr><th style="width:30%">Champ</th><th style="width:12%">Obligatoire</th><th>Description</th></tr>
+        <tr><td><b>Code</b></td><td>oui</td><td>Identifiant unique (minuscules, tirets) ex. <code>gestion-conges</code>.</td></tr>
+        <tr><td><b>Nom</b></td><td>oui</td><td>Nom affiché ex. « Gestion des Congés ».</td></tr>
+        <tr><td><b>Description</b></td><td>non</td><td>Texte court affiché sur la carte.</td></tr>
+        <tr><td><b>URL</b></td><td>oui</td><td>Adresse racine de l'application ex. <code>http://localhost/App</code>.</td></tr>
+        <tr><td><b>Redirect URI (SSO)</b></td><td>non</td><td>Automatiquement <code>&lt;URL&gt;/iam-sso-&lt;code&gt;.php</code> si vide.</td></tr>
+        <tr><td><b>Couleur</b></td><td>non</td><td>Couleur de l'icône (défaut <code>#4361ee</code>).</td></tr>
+        <tr><td><b>Icône (FontAwesome)</b></td><td>non</td><td>Classe d'icône (défaut <code>fa-cube</code>).</td></tr>
+        <tr><td><b>Active</b></td><td>—</td><td>Cochée : l'application peut être utilisée en SSO.</td></tr>
+      </table>
+    </li>
+    <li>Cliquer sur <b>Enregistrer</b>.</li>
+  </ol>
+
+  <h2>7.2 Déploiement SSO automatique</h2>
+  <p>À la création (ou si l'URL change), l'IAM <b>déploie automatiquement l'intégration SSO</b> dans le dossier local de l'application :</p>
+  <ul>
+    <li>génération d'un <b>client_id</b> (<code>iam-native-&lt;code&gt;</code>) et d'un <b>client_secret</b> unique ;</li>
+    <li>génération du fichier <b>garde</b> <code>iam-sso-&lt;code&gt;.php</code> à la racine de l'application ;</li>
+    <li>ajout dans le fichier <code>.htaccess</code> de l'application d'un bloc <code>auto_prepend_file</code> qui charge le garde sur <b>toutes les pages PHP</b>.</li>
+  </ul>
+  <div class="ok callout">&#9989; Résultat : l'accès direct au lien de l'application redirige automatiquement vers l'IAM pour la connexion, puis ramène l'utilisateur sur la page demandée — sans aucune modification de code côté application.</div>
+
+  <h2>7.3 Le panneau « Intégration SSO »</h2>
+  <p>La carte de chaque application affiche l'état de la protection et propose :</p>
+  <table>
+    <tr><th style="width:35%">Statut affiché</th><th>Signification</th></tr>
+    <tr><td><span class="badge badge-green">Active (lien direct protégé)</span></td><td>Fichier garde + .htaccess présents : protection active.</td></tr>
+    <tr><td><span class="badge badge-warn">Fichier présent, .htaccess manquant</span></td><td>Le garde existe mais le chargement automatique n'est pas en place.</td></tr>
+    <tr><td><span class="badge badge-warn">Déploiement manuel</span></td><td>Application hébergée hors du disque local (serveur distant) : déploier le garde manuellement.</td></tr>
+    <tr><td><span class="badge">Non déployée</span> / Dossier introuvable</td><td>Protection à mettre en place ou chemin local non résolu.</td></tr>
+  </table>
+  <p>Boutons disponibles :</p>
+  <ul>
+    <li><b>Télécharger le fichier d'intégration</b> → récupère <code>iam-sso-&lt;code&gt;.php</code> (pour un déploiement manuel).</li>
+    <li><b>Générer / redéployer</b> → relance le déploiement (idempotent).</li>
+    <li><b>Retirer la protection</b> → supprime le fichier garde et le bloc .htaccess généré.</li>
+  </ul>
+
+  <h2>7.4 Permissions de l'application</h2>
+  <p>Le bouton <b>Permissions (N)</b> ouvre la gestion des permissions de l'application :</p>
+  <ul>
+    <li>Modifier directement le <b>nom</b>, le <b>code</b> et la <b>description</b> d'une permission puis cliquer <b>Enregistrer</b>.</li>
+    <li>Supprimer une permission après confirmation; elle est alors retirée des rôles qui la portaient.</li>
+    <li>Ajouter une permission avec son <b>nom</b>*, son <b>code</b>* et une description.</li>
+  </ul>
+  <div class="warn callout">Le code est unique dans toute la plateforme et peut être utilisé dans le code de l'application. Avant de le modifier, repérez ses usages et mettez-les à jour; testez ensuite l'accès autorisé et le refus des autres rôles.</div>
+
+  <h2>7.5 Accès utilisateurs</h2>
+  <p>Le bouton <b>Accès utilisateurs (N)</b> gère qui peut accéder à l'application :</p>
+  <ul>
+    <li><b>Utilisateurs autorisés</b> : liste des utilisateurs avec leur rôle et un bouton de retrait ;</li>
+    <li><b>Donner l'accès</b> : sélection d'un utilisateur actif + d'un rôle, puis bouton <b>Donner l'accès</b>.</li>
+  </ul>
+
+  <h2>7.6 Supprimer une application</h2>
+  <p>Bouton corbeille (les applications système, <code>is_system=1</code>, ne peuvent pas être supprimées).</p>
+
+  <div class="warn callout">&#9888;&#65039; Pour une application hébergée <b>hors localhost</b> (serveur distant), le déploiement automatique est impossible (statut « Déploiement manuel ») : téléchargez le fichier garde et incluez-le via <code>require_once __DIR__ . '/iam-sso-&lt;code&gt;.php';</code> dans les pages à protéger, ou déposez-le à la racine avec le .htaccess correspondant.</div>
+</div>
+
+<!-- ================= 8. ROLES & PERMISSIONS ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s8">8. Rôles &amp; permissions</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Rôles &amp; permissions</b>. Chaque rôle appartient à une application. Les cartes affichent le nom, le code, l'application propriétaire, la description, le nombre de permissions et le nombre d'attributions.</p>
+
+  <h2>8.1 Profils standards</h2>
+  <table>
+    <tr><th>Code</th><th>Profil</th><th>Principe d'accès</th></tr>
+    <tr><td><code>admin</code></td><td>Administrateur</td><td>Accès complet à son application; seul le rôle admin de l'application <code>iam-admin</code> administre la plateforme.</td></tr>
+    <tr><td><code>gestionnaire_rh</code></td><td>Gestionnaire RH</td><td>Opérations métier définies par les permissions de chaque application.</td></tr>
+    <tr><td><code>agent</code></td><td>Agent</td><td>Consultation uniquement; aucune création, modification, suppression ou validation.</td></tr>
+    <tr><td><code>auditeur</code></td><td>Auditeur</td><td>Consultation et export si l'application lui attribue une permission d'export; aucune écriture.</td></tr>
+  </table>
+  <p>Des rôles métier propres à certaines applications peuvent compléter ces profils (par exemple <code>employe</code>, <code>technicien</code>, <code>operateur</code> ou <code>magasinier</code>). Un rôle affichant <b>0 permission</b> ne donne aucun accès métier à un utilisateur non administrateur.</p>
+
+  <h2>8.2 Créer un rôle</h2>
+  <ol class="steps">
+    <li>Cliquer sur <b>Créer un rôle</b>.</li>
+    <li>Saisir <b>Nom du rôle</b>* (ex. « Superviseur Paie ») et <b>Code</b>* (ex. <code>superviseur_paie</code>).</li>
+    <li>Ajouter éventuellement une <b>description</b>.</li>
+    <li>Cliquer sur <b>Créer</b>.</li>
+  </ol>
+
+  <h2>8.3 Attribuer des permissions</h2>
+  <ol class="steps">
+    <li>Sur la carte du rôle, cliquer sur <b>Permissions</b>.</li>
+    <li>La fenêtre présente les permissions groupées <b>par application</b>.</li>
+    <li>Cocher/décocher les permissions souhaitées (badges cliquables).</li>
+    <li>Cliquer sur <b>Enregistrer</b>.</li>
+  </ol>
+  <div class="info callout">&#8505;&#65039; Les permissions des rôles système peuvent être configurées graphiquement. Leur nom et leur code restent protégés, et leur suppression est interdite.</div>
+
+  <h2>8.4 Supprimer un rôle</h2>
+  <p>Bouton corbeille sur une carte de rôle non système (avec confirmation). Un rôle système ne peut pas être supprimé.</p>
+</div>
+
+<!-- ================= 9. ORGANISATIONS ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s9">9. Organisations</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Organisations</b>. Construit un <b>arbre hiérarchique</b> : ministère → direction générale → direction → service → bureau.</p>
+
+  <h2>9.1 Types d'organisation</h2>
+  <p><span class="badge">ministère</span> <span class="badge">direction_generale</span> <span class="badge">direction</span> <span class="badge">service</span> <span class="badge">bureau</span> <span class="badge">autre</span></p>
+
+  <h2>9.2 Créer une organisation</h2>
+  <ol class="steps">
+    <li>Cliquer sur <b>Nouvelle organisation</b>.</li>
+    <li>Saisir <b>Nom</b>* (obligatoire), <b>Code</b>, choisir le <b>type</b> et l'<b>organisation parente</b> (« — Aucune (racine) — » pour une racine).</li>
+    <li>Cliquer sur <b>Créer</b>.</li>
+  </ol>
+
+  <h2>9.3 Modifier / supprimer</h2>
+  <ul>
+    <li><b>Modifier</b> (icône crayon) : nom, code, type, parent.</li>
+    <li><b>Supprimer</b> : possible uniquement si aucun utilisateur n'est rattaché (« Cette organisation contient des utilisateurs. Déplacez-les d'abord. »).</li>
+  </ul>
+  <p>Les utilisateurs sont rattachés à une organisation au moment de leur création ou modification (page Utilisateurs).</p>
+</div>
+
+<!-- ================= 10. SESSIONS ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s10">10. Sessions utilisateurs</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Sessions</b>. Liste de toutes les sessions IAM actives avec : utilisateur, IP, navigateur (user-agent), création, dernière activité, expiration, statut et actions.</p>
+
+  <h2>10.1 Statuts</h2>
+  <table>
+    <tr><th>Statut</th><th>Signification</th></tr>
+    <tr><td><span class="badge badge-green">active</span></td><td>Session en cours, non expirée.</td></tr>
+    <tr><td><span class="badge badge-warn">expirée</span></td><td>La date d'expiration est dépassée.</td></tr>
+    <tr><td><span class="badge">révoquée</span></td><td>Session invalidée manuellement ou à la déconnexion.</td></tr>
+  </table>
+
+  <h2>10.2 Révoquer</h2>
+  <ul>
+    <li>Icône &#128683; rouge : révoque <b>une</b> session.</li>
+    <li>Icône &#128683; encadrée : révoque <b>toutes</b> les sessions d'un utilisateur (ex. matériel volé).</li>
+  </ul>
+  <div class="info callout">&#8505;&#65039; Filtre par utilisateur (select) + bouton <b>Filtrer</b> pour restreindre la liste. Les révocations sont journalisées (<code>session_revoked</code>, <code>sessions_revoked</code>).</div>
+</div>
+
+<!-- ================= 11. AUDIT ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s11">11. Journal d'audit</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Journal d'audit</b>. Trace exhaustive et horodatée des actions sensibles.</p>
+
+  <h2>11.1 Filtres</h2>
+  <ul>
+    <li>Champ de recherche <b>q</b> (e-mail, action, détails, IP).</li>
+    <li>Select <b>action</b> : filtre par type d'événement.</li>
+    <li>Boutons <b>Filtrer</b> (&#128269;) et <b>Effacer</b> (retour à la liste complète).</li>
+  </ul>
+
+  <h2>11.2 Informations affichées</h2>
+  <p>Date, action (badge coloré), utilisateur (e-mail + identifiant), détails, IP, navigateur. Si la géolocalisation est activée
+  (<code>geoip_lookup</code>, voir <a href="#s12">« Paramètres »</a>), une colonne <b>pays</b> apparaît (IP privée = « Réseau local »).
+  Pagination : 30 lignes par page.</p>
+
+  <h2>11.3 Événements principaux tracés</h2>
+  <p>
+    <span class="badge badge-green">login_success</span>
+    <span class="badge badge-green">password_changed</span>
+    <span class="badge badge-green">password_reset</span>
+    <span class="badge badge-green">user_created</span>
+    <span class="badge badge-green">user_updated</span>
+    <span class="badge badge-green">app_created</span>
+    <span class="badge badge-green">app_access_granted</span>
+    <span class="badge badge-green">role_created</span>
+    <span class="badge badge-green">sso_issue</span>
+    <span class="badge badge-green">sso_login</span>
+    <span class="badge badge-green">mfa_verified</span>
+    <span class="badge badge-green">group_created</span>
+    <span class="badge badge-green">import_users</span>
+    <span class="badge badge-green">oauth_consent</span>
+    <span class="badge badge-green">oauth_token</span>
+    <span class="badge badge-green">oauth_client_credentials</span>
+    <span class="badge badge-green">oauth_client_created</span>
+    <span class="badge badge-green">oauth_key_rotated</span>
+    <span class="badge badge-warn">account_locked</span>
+    <span class="badge badge-warn">mfa_lockout</span>
+    <span class="badge badge-red">session_revoked</span>
+    <span class="badge badge-red">user_deleted</span>
+    <span class="badge badge-red">sso_removed</span>
+  </p>
+</div>
+
+<!-- ================= 12. PARAMETRES ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s12">12. Paramètres — politique de mot de passe</h1>
+  <p>Menu <span class="badge">Administration</span> → <b>Paramètres</b>. Configure la politique de sécurité des mots de passe :</p>
+
+  <h2>12.1 Champs disponibles</h2>
+  <table>
+    <tr><th style="width:34%">Paramètre</th><th style="width:12%">Défaut</th><th>Description</th></tr>
+    <tr><td>Longueur minimale</td><td>8</td><td>Nombre minimal de caractères (4 à 32).</td></tr>
+    <tr><td>Historique (nb de mots de passe mémorisés)</td><td>5</td><td>Empêche la réutilisation immédiate (0 à 20).</td></tr>
+    <tr><td>Expiration (jours)</td><td>90</td><td>Durée de validité du mot de passe (0 = jamais).</td></tr>
+    <tr><td>Verrouillage après (tentatives échouées)</td><td>5</td><td>Nombre d'échecs avant verrouillage.</td></tr>
+    <tr><td>Durée de verrouillage (minutes)</td><td>30</td><td>Temps de verrouillage du compte.</td></tr>
+    <tr><td>Durée de session (secondes)</td><td>3600</td><td>Durée maximale de la session.</td></tr>
+    <tr><td>Durée avant inactivité (secondes)</td><td>1800</td><td>Déconnexion automatique après inactivité.</td></tr>
+  </table>
+
+  <h2>12.2 Complexité exigée</h2>
+  <ul>
+    <li><b>Au moins une lettre majuscule</b> (<code>require_upper</code>)</li>
+    <li><b>Au moins une lettre minuscule</b> (<code>require_lower</code>)</li>
+    <li><b>Au moins un chiffre</b> (<code>require_digit</code>)</li>
+    <li><b>Au moins un caractère spécial</b> (<code>require_special</code>)</li>
+  </ul>
+  <p>Après modification, cliquer sur <b>Enregistrer la politique</b>. Un audit <code>policy_updated</code> est émis.</p>
+
+  <h2>12.3 Informations plateforme (lecture seule)</h2>
+  <p>La page affiche aussi les informations statiques : nom (<code>IAM_NAME</code>), version, URL, base de données, état SMTP et récapitulatif de la politique active.</p>
+  <div class="info callout">&#8505;&#65039; Le SMTP sert à l'envoi des codes MFA par e-mail. Non configuré, l'IAM passe en <b>mode démonstration</b> : le code OTP s'affiche directement à l'écran.</div>
+
+  <h2>12.4 API &amp; sécurité</h2>
+  <p>Dans la carte « API &amp; sécurité » de la même page :</p>
+  <table>
+    <tr><th style="width:34%">Paramètre</th><th style="width:12%">Défaut</th><th>Description</th></tr>
+    <tr><td><b>Origines autorisées (CORS)</b> — <code>cors_origins</code></td><td><code>*</code></td><td>Liste séparée par des virgules des origines autorisées à appeler l'API IAM depuis un navigateur (ex. <code>https://app.monchantier.ci, http://localhost:8080</code>). <code>*</code> = toutes les origines (API publique).</td></tr>
+    <tr><td><b>Recherche du pays des IP</b> — <code>geoip_lookup</code></td><td>désactivé</td><td>Active la géolocalisation des adresses IP publiques (service ip-api.com, données <b>non stockées</b>) pour renseigner la colonne « pays » des journaux d'audit. Les IP privées/locales restent affichées « Réseau local ».</td></tr>
+  </table>
+  <div class="warn callout">&#9888;&#65039; Protection anti brute-force par IP : <b>60 échecs max / 15 minutes</b> par adresse IP (constantes <code>IP_RATE_MAX_ATTEMPTS</code> / <code>IP_RATE_WINDOW_MINUTES</code>), appliquée aux pages <b>et</b> aux API de connexion, en plus du verrouillage par compte (5 échecs / 30 min).</div>
+</div>
+
+<!-- ================= 13. MON PROFIL ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s13">13. Mon profil (espace utilisateur)</h1>
+  <p>À l'écran « Mon profil » (<code>profile.php</code>), chaque utilisateur dispose de :</p>
+
+  <h2>13.1 Informations personnelles (lecture seule)</h2>
+  <p>Nom complet, identifiant, e-mail, téléphone, matricule, organisation, dernière connexion, état MFA (<span class="badge badge-green">Activé</span> / <span class="badge">Désactivé</span>).</p>
+
+  <h2>13.2 Rôles et applications</h2>
+  <p>Liste des applications accessibles, rôles par application et permissions rattachées (badges de codes).</p>
+
+  <h2>13.3 Changer son mot de passe</h2>
+  <table>
+    <tr><th style="width:34%">Champ</th><th>Description</th></tr>
+    <tr><td><b>Mot de passe actuel</b> *</td><td>Mot de passe actuel du compte.</td></tr>
+    <tr><td><b>Nouveau mot de passe</b> *</td><td>Doit respecter la politique (min. 8 caractères, majuscule, minuscule, chiffre, caractère spécial).</td></tr>
+    <tr><td><b>Confirmer le nouveau mot de passe</b> *</td><td>Identique au précédent.</td></tr>
+  </table>
+  <p>Bouton <b>Mettre à jour</b>. Le mot de passe doit être différent du précédent et absent de l'historique récent.</p>
+
+  <h2>13.4 Mes sessions actives</h2>
+  <p>Table des sessions ouvertes (IP, navigateur, création, expiration) et bouton <b>« Tout déconnecter ailleurs »</b> qui révoque toutes les sessions autres que la session courante.</p>
+</div>
+
+<!-- ================= 14. MFA ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s14">14. Authentification à deux facteurs (MFA)</h1>
+  <p>Lorsqu'un compte a la MFA activée, la connexion est suivie d'une vérification par <b>code OTP à 6 chiffres</b> :</p>
+  <ol class="steps">
+    <li>Connexion classique (identifiant + mot de passe).</li>
+    <li>Redirection vers <code>mfa.php</code> : un code à 6 chiffres est <b>envoyé par e-mail</b>.</li>
+    <li>Saisie du code puis bouton <b>Vérifier et continuer</b>.</li>
+  </ol>
+
+  <h2>14.1 Liens utiles</h2>
+  <ul>
+    <li><b>Renvoyer le code</b> : émet un nouveau code.</li>
+    <li><b>Annuler</b> : déconnecte et revient à la page de connexion.</li>
+  </ul>
+
+  <h2>14.2 Règles</h2>
+  <ul>
+    <li>Validité du code : 5 minutes.</li>
+    <li>5 échecs maximum → la session est détruite et l'utilisateur renvoyé à la page de connexion (<code>mfa_lockout</code> tracé).</li>
+    <li><b>Mode démonstration</b> : sans SMTP configuré, le code OTP est affiché directement à l'écran dans un encart orange.</li>
+  </ul>
+  <div class="warn callout">&#9888;&#65039; L'activation/désactivation de la MFA n'est pas exposée dans l'interface administrateur : elle se règle en base (colonne <code>mfa_enabled</code> de la table <code>users</code>).</div>
+</div>
+
+<!-- ================= 15. SSO TECHNIQUE ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s15">15. Fonctionnement du SSO (référence technique)</h1>
+  <p>Le SSO repose sur la <b>rédemption d'un jeton à usage unique</b> : l'IAM émet un jeton, l'application le consomme auprès de l'API IAM et ouvre sa session locale.</p>
+
+  <h2>15.1 URL impliquées</h2>
+  <table>
+    <tr><th style="width:45%">Adresse</th><th>Rôle</th></tr>
+    <tr><td><code>IAM_BASE_URL/sso/authorize.php?app=&lt;code&gt;&amp;return=&lt;url&gt;&amp;prompt=login</code></td><td>Point d'entrée SSO : vérifie l'accès et émet le jeton.</td></tr>
+    <tr><td><code>IAM_BASE_URL/login.php</code></td><td>Connexion utilisateur.</td></tr>
+    <tr><td><code>IAM_BASE_URL/mfa.php</code></td><td>Vérification 2 facteurs (si activée).</td></tr>
+    <tr><td><code>IAM_BASE_URL/api/sso/validate.php</code></td><td>API POST JSON <code>{token, app_code}</code> : consomme le jeton et renvoie l'utilisateur, les rôles et les permissions.</td></tr>
+    <tr><td><code>IAM_BASE_URL/admin/download_sso.php?app=&lt;code&gt;</code></td><td>Téléchargement du fichier garde.</td></tr>
+  </table>
+
+  <h2>15.2 Scénario : accès direct à une application protégée</h2>
+  <ol class="steps">
+    <li>L'utilisateur ouvre <code>http://localhost/Application/page.php</code>.</li>
+    <li>Le garde <code>iam-sso-&lt;code&gt;.php</code> (chargé par <code>auto_prepend_file</code>) démarre une session locale isolée <code>iam_app_&lt;code&gt;</code>.</li>
+    <li>Non authentifié → redirection vers <code>sso/authorize.php?app=&lt;code&gt;&amp;return=&lt;page demandée&gt;&amp;prompt=login</code>.</li>
+    <li><code>authorize.php</code> envoie l'utilisateur sur <code>login.php</code> (ou force la ressaisie si <code>prompt=login</code>).</li>
+    <li>Après connexion (et MFA / changement de mot de passe éventuels), retour sur <code>authorize.php</code>.</li>
+    <li><code>authorize.php</code> vérifie : application <b>active</b>, utilisateur avec un <b>rôle</b> sur l'app (ou admin global), <b>URL de retour</b> sur le même hôte que l'application.</li>
+    <li>Jeton SSO à usage unique créé (validité 60 s) → redirection vers <code>returnUrl?sso_token=…</code>.</li>
+    <li>Le garde envoie le jeton à <code>api/sso/validate.php</code>, qui le consomme et renvoie <code>access_token</code> (JWT 1 h), profils, rôles, permissions.</li>
+    <li>Le garde ouvre la session locale, retire <code>sso_token</code> de l'URL et affiche la page.</li>
+    <li>Pages suivantes : <code>iam_sso_authenticated()</code> passe directement.</li>
+  </ol>
+
+  <h2>15.3 Fonctions fournies au développeur d'application</h2>
+  <table>
+    <tr><th style="width:34%">Fonction</th><th>Rôle</th></tr>
+    <tr><td><code>iam_sso_authenticated()</code></td><td>Indique si l'utilisateur est connecté via SSO.</td></tr>
+    <tr><td><code>iam_sso_user()</code></td><td>Retourne le profil (id, username, email, prénom, nom, matricule...).</td></tr>
+    <tr><td><code>iam_sso_has_permission($code)</code></td><td>Vérifie une permission (ex. <code>salary.validate</code>).</td></tr>
+    <tr><td><code>iam_sso_logout()</code></td><td>Clôture la session SSO locale.</td></tr>
+  </table>
+
+  <h2>15.4 Paramètres du point d'entrée SSO</h2>
+  <table>
+    <tr><th style="width:22%">Paramètre GET</th><th>Description</th></tr>
+    <tr><td><code>app</code></td><td>Code de l'application (obligatoire).</td></tr>
+    <tr><td><code>return</code></td><td>URL de retour (optionnelle ; doit appartenir à l'application, même hôte — port ignoré).</td></tr>
+    <tr><td><code>prompt=login</code></td><td>Force la ressaisie des identifiants IAM même si déjà connecté.</td></tr>
+  </table>
+
+  <h2>15.5 Réponses de l'API de validation</h2>
+  <table>
+    <tr><th style="width:12%">Code</th><th>Signification</th></tr>
+    <tr><td>200</td><td>Jeton valide → <code>access_token</code>, <code>user</code>, <code>roles</code>, <code>permissions</code>.</td></tr>
+    <tr><td>401</td><td>Jeton invalide, expiré ou déjà consommé.</td></tr>
+    <tr><td>403</td><td>Jeton non rattaché à l'application demandée.</td></tr>
+    <tr><td>422</td><td>Paramètre manquant (<code>token</code> / <code>app_code</code>).</td></tr>
+  </table>
+
+  <h2>15.6 Serveur OAuth 2.0 / OIDC (Authorization Code + PKCE)</h2>
+  <p>L'IAM expose aussi un <b>serveur d'autorisation</b> pour les applications « tout type » (SPA, mobiles, services) :</p>
+  <table>
+    <tr><th style="width:45%">Adresse</th><th>Rôle</th></tr>
+    <tr><td><code>IAM_BASE_URL/oauth.php</code></td><td>Demande d'autorisation + page de consentement (paramètres <code>response_type=code</code>, <code>client_id</code>, <code>redirect_uri</code>, <code>scope</code>, <code>state</code>, <code>code_challenge</code>, <code>code_challenge_method</code>, <code>nonce</code>).</td></tr>
+    <tr><td><code>IAM_BASE_URL/api/oauth/token.php</code></td><td>POST : échange du code (avec vérification PKCE) ou <code>refresh_token</code> (rotation : le jeton consommé est révoqué) ou <code>client_credentials</code>.</td></tr>
+    <tr><td><code>IAM_BASE_URL/api/oauth/userinfo.php</code></td><td>GET avec <code>Authorization: Bearer &lt;access_token&gt;</code> : profil OIDC (sub, name, email, poste…).</td></tr>
+    <tr><td><code>IAM_BASE_URL/api/oauth/jwks.php</code></td><td>Clés publiques de vérification des JWT (RS256).</td></tr>
+    <tr><td><code>IAM_BASE_URL/.well-known/openid-configuration.php</code></td><td>Découverte OIDC (issuer, endpoints, PKCE supporté).</td></tr>
+  </table>
+  <ul>
+    <li>Scopes autorisés : <code>openid</code>, <code>profile</code>, <code>email</code>.</li>
+    <li>L'<code>id_token</code> (JWT RS256) contient <code>sub</code>, <code>aud</code> (client), <code>iss</code>, <code>exp</code>, <code>iat</code>, <code>nonce</code> et les claims du profil demandé.</li>
+    <li>La gestion des clients et la rotation de clé se font dans <span class="badge">Administration</span> → <b>OAuth / OIDC</b> ; le secret du client n'est affiché qu'à la création.</li>
+    <li>Le consentement est demandé à l'utilisateur et le refus est journalisé (<code>access_denied</code>).</li>
+  </ul>
+</div>
+
+<!-- ================= 16. BONNES PRATIQUES ================= -->
+<div class="page" style="page-break-before:always;">
+  <h1 id="s16">16. Bonnes pratiques &amp; dépannage</h1>
+
+  <h2>16.1 Bonnes pratiques</h2>
+  <ul>
+    <li><b>Administrateur principal</b> : conservez le compte (id 1) ; il ne peut pas être supprimé et doit rester l'ultime recours.</li>
+    <li><b>Mots de passe temporaires</b> : utilisez le mot de passe généré aléatoirement par l'IAM et forcez son changement à la première connexion.</li>
+    <li><b>Rôles par app</b> : attribuez le rôle le moins privilégié nécessaire (principe du moindre privilège).</li>
+    <li><b>Sessions</b> : révoquez les sessions d'un utilisateur en cas de départ ou d'appareil perdu.</li>
+    <li><b>Audit</b> : consultez régulièrement le journal pour détecter les accès anormaux.</li>
+    <li><b>Organisations</b> : construisez l'arbre avant de créer les utilisateurs pour faciliter le rattachement.</li>
+  </ul>
+
+  <h2>16.2 Dépannage</h2>
+  <table>
+    <tr><th style="width:42%">Problème</th><th>Solution</th></tr>
+    <tr><td>« Écran Déjà installé » alors que je veux réinitialiser</td><td>Utiliser <b>Réinstaller / mettre à jour</b> (ré-exécution idempotente du schéma et des données).</td></tr>
+    <tr><td>Accès direct à une application non redirigé vers l'IAM</td><td>Vérifier le statut d'intégration SSO dans Applications : relancer <b>Générer / redéployer</b>.</td></tr>
+    <tr><td>« Dossier introuvable » après déploiement</td><td>Le chemin local n'est pas résolu depuis l'URL (serveur distant) : passage en déploiement manuel.</td></tr>
+    <tr><td>Utilisateur ne voit pas une application au portail</td><td>Lui attribuer un rôle sur cette application (Applications → Accès utilisateurs, ou Utilisateurs → Rôles par application).</td></tr>
+    <tr><td>403 « Vous n'avez pas accès à cette application »</td><td>Même cause : aucun rôle (et non admin) sur l'application.</td></tr>
+    <tr><td>403 « URL de retour invalide »</td><td>L'URL de retour n'a pas le même hôte que l'URL de l'application.</td></tr>
+    <tr><td>« Compte verrouillé »</td><td>Attendre la fin de la durée de verrouillage, puis réessayer.</td></tr>
+    <tr><td>Code MFA non reçu</td><td>SMTP non configuré : mode démonstration, le code s'affiche à l'écran ; sinon cliquer « Renvoyer le code ».</td></tr>
+    <tr><td>Fichier <code>.htaccess</code> modifié manuellement écrasé ?</td><td>L'IAM conserve une sauvegarde <code>.iam-backup-&lt;date&gt;</code> lors du redéploiement.</td></tr>
+  </table>
+
+  <h2>16.3 Annexe — Architecture des données</h2>
+  <table>
+    <tr><th style="width:26%">Table</th><th>Rôle</th></tr>
+    <tr><td><code>organizations</code></td><td>Hiérarchie organisationnelle.</td></tr>
+    <tr><td><code>users</code></td><td>Comptes utilisateurs (statut, MFA, verrouillage).</td></tr>
+    <tr><td><code>applications</code></td><td>Applications SSO (code, URL, client secret, actif).</td></tr>
+    <tr><td><code>roles</code> / <code>permissions</code></td><td>Rôles et droits.</td></tr>
+    <tr><td><code>role_permissions</code> / <code>user_roles</code></td><td>Matrices rôle→permission et utilisateur→rôle→application.</td></tr>
+    <tr><td><code>sessions</code></td><td>Sessions IAM révocables.</td></tr>
+    <tr><td><code>sso_tokens</code></td><td>Jetons SSO à usage unique.</td></tr>
+    <tr><td><code>password_policy</code> / <code>password_history</code></td><td>Politique de mots de passe et historique.</td></tr>
+    <tr><td><code>mfa_devices</code> / <code>otp_codes</code></td><td>2e facteur d'authentification.</td></tr>
+    <tr><td><code>audit_logs</code> / <code>login_attempts</code></td><td>Journal d'audit et anti force brute.</td></tr>
+  </table>
+
+  <div class="footer-note">IAM-Local — Plateforme d'identité et d'accès (IAM/SSO) &middot; Documentation utilisateur v1.1.0</div>
+</div>
+
+<div class="page uml-page">
+  <h1 id="s17">17. Diagramme UML de classes</h1>
+  <p>Vue du modèle métier IAM : identités, organisations, applications, rôles, permissions, sessions, jetons SSO, MFA et audit. Les associations <code>UserRole</code> et <code>RolePermission</code> matérialisent les relations plusieurs-à-plusieurs.</p>
+  <div class="mermaid">
+classDiagram
+direction LR
+namespace Identites {
+  class User {
+    +int id
+    +string username
+    +string email
+    +string status
+    +bool mfa_enabled
+  }
+  class Organization {
+    +int id
+    +int parent_id
+    +string name
+    +string code
+    +string type
+  }
+  class Group {
+    +int id
+    +string name
+    +string description
+  }
+  class UserGroup {
+    +int user_id
+    +int group_id
+  }
+  class PasswordHistory {
+    +int id
+    +int user_id
+    +datetime created_at
+  }
+  class MfaDevice {
+    +int id
+    +int user_id
+    +string type
+    +bool verified
+  }
+  class OtpCode {
+    +int id
+    +int user_id
+    +datetime expires_at
+    +bool used
+  }
+}
+namespace RBAC_par_application {
+  class Application {
+    +int id
+    +string code
+    +string name
+    +string url
+    +bool active
+  }
+  class Role {
+    +int id
+    +int application_id
+    +string name
+    +string code
+    +bool is_system
+  }
+  class Permission {
+    +int id
+    +int application_id
+    +string code
+    +string name
+  }
+  class UserRole {
+    +int user_id
+    +int role_id
+    +int application_id
+  }
+  class RolePermission {
+    +int role_id
+    +int permission_id
+  }
+}
+namespace Sessions_et_Federation {
+  class Session {
+    +int id
+    +int user_id
+    +datetime expires_at
+    +bool revoked
+  }
+  class SsoToken {
+    +int id
+    +int user_id
+    +int application_id
+    +datetime expires_at
+    +datetime consumed_at
+  }
+  class OAuthClient {
+    +int id
+    +string client_id
+    +string redirect_uris
+    +bool active
+  }
+}
+namespace Gouvernance {
+  class AuditLog {
+    +int id
+    +int user_id
+    +string action
+    +string application
+    +datetime created_at
+  }
+}
+Organization "0..1" <-- "0..*" User : organisation
+Organization "0..1" <-- "0..*" Organization : hierarchie
+User "1" <-- "0..*" UserRole : attribution
+Role "1" <-- "0..*" UserRole : role
+Application "1" <-- "0..*" UserRole : perimetre
+Application "1" <-- "0..*" Role : roles locaux
+Application "1" <-- "0..*" Permission : catalogue
+Role "1" <-- "0..*" RolePermission : droits
+Permission "1" <-- "0..*" RolePermission : permission
+User "1" <-- "0..*" UserGroup : appartenance
+Group "1" <-- "0..*" UserGroup : membres
+User "1" <-- "0..*" Session : sessions
+User "1" <-- "0..*" SsoToken : emet
+Application "1" <-- "0..*" SsoToken : cible
+User "1" <-- "0..*" PasswordHistory : historique
+User "1" <-- "0..*" MfaDevice : facteurs
+User "1" <-- "0..*" OtpCode : codes
+User "0..1" <-- "0..*" AuditLog : acteur
+  </div>
+  <p class="footer-note">Source détaillée modifiable : <code>docs/uml-classes.mmd</code>.</p>
+</div>
+
+<div class="page uml-page">
+  <h1 id="s18">18. Diagramme UML d'activité — SSO et autorisation</h1>
+  <p>Le flux vérifie l’application, l’authentification et le MFA, consomme un jeton à usage unique, puis applique les permissions au niveau de chaque page et opération.</p>
+  <div class="mermaid">
+flowchart LR
+subgraph USER["Couloir Utilisateur"]
+  direction TB
+  uOpen([Ouvre une application])
+  uCredentials[Saisit identifiant et mot de passe]
+  uMfa[Saisit le code MFA]
+  uAction[Demande une page ou une action]
+  uResult([Voit la page ou le refus])
+end
+subgraph APP["Couloir Application cliente"]
+  direction TB
+  appGuard[Intercepte la requete et redirige vers IAM]
+  appCallback[Reçoit sso_token au callback]
+  appExchange[Appelle POST api/sso/validate.php]
+  appSession[Ouvre la session locale avec roles et permissions]
+  appCheck[Controle la permission de la route et de l'action]
+  appWrite[Execute l'ecriture metier]
+end
+subgraph IAM["Couloir IAM-Local"]
+  direction TB
+  iamAuthorize[Traite sso/authorize.php]
+  appDecision{Application active?}
+  loginDecision{Session IAM valide?}
+  credentialDecision{Compte actif et credentials valides?}
+  mfaDecision{MFA requis et valide?}
+  grantDecision{Role sur l'application ou admin global?}
+  issueToken[Emet un jeton SSO a usage unique]
+  validateDecision{Jeton valide et code app identique?}
+  userDecision{Utilisateur actif?}
+  profile[Construit profil scope app_id roles permissions]
+  permissionDecision{Permission requise presente?}
+  writeDecision{Action d'ecriture?}
+  writePermission{Permission de gestion / saisie / validation?}
+  denied[Retourne 401 / 403]
+  audit[Enregistre l'evenement sensible]
+end
+subgraph DB["Couloir Base iam_local"]
+  direction TB
+  dbApp[Lit application active et URL]
+  dbUser[Lit compte et statut]
+  dbMfa[Verifie OTP ou appareil MFA]
+  dbGrant[Lit user_roles pour application_id]
+  dbIssue[Insere sso_tokens et expiration]
+  dbConsume[Verrouille puis consomme le jeton atomiquement]
+  dbProfile[Charge roles et permissions de l'application cible]
+  dbAudit[Insere audit_logs]
+end
+uOpen --> appGuard --> iamAuthorize --> dbApp --> appDecision
+appDecision -- non --> deniedApp[Application inactive ou inconnue]
+appDecision -- oui --> loginDecision
+loginDecision -- non --> uCredentials --> dbUser --> credentialDecision
+credentialDecision -- non --> denied
+credentialDecision -- oui --> mfaDecision
+loginDecision -- oui --> mfaDecision
+mfaDecision -- oui --> uMfa --> dbMfa --> mfaDecision
+mfaDecision -- non requis ou valide --> dbGrant --> grantDecision
+grantDecision -- non --> denied
+grantDecision -- oui --> issueToken --> dbIssue --> appCallback
+appCallback --> appExchange --> dbConsume --> validateDecision
+validateDecision -- non --> denied
+validateDecision -- oui --> dbUser --> userDecision
+userDecision -- non --> denied
+userDecision -- oui --> dbProfile --> profile --> appSession --> uAction --> appCheck
+appCheck --> permissionDecision
+permissionDecision -- non --> denied
+permissionDecision -- oui --> writeDecision
+writeDecision -- lecture --> uResult
+writeDecision -- ecriture --> writePermission
+writePermission -- non --> denied
+writePermission -- oui --> appWrite --> audit --> dbAudit --> uResult
+deniedApp --> uResult
+denied --> uResult
+classDef allowed fill:#e7f6ec,stroke:#238636,color:#111
+classDef refused fill:#fff0f0,stroke:#cf222e,color:#111
+class appSession,appWrite,dbConsume,dbAudit allowed
+class deniedApp,denied refused
+  </div>
+  <p class="footer-note">Source détaillée modifiable : <code>docs/uml-activite-sso.mmd</code>.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>if (window.mermaid) { mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'strict' }); }</script>
+</body>
+</html>

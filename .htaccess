@@ -1,0 +1,57 @@
+# ============================================================
+# IAM-Local — Rewrite rules principales
+# ATTENTION : ce fichier est RÉGÉNÉRÉ par l'installateur avec le
+# chemin de dossier détecté. Si vous le modifiez manuellement,
+# réexécutez install.php (ou adaptez le chemin ci-dessous).
+# ============================================================
+
+RewriteEngine On
+
+# ── Passer l'en-tête Authorization à PHP sous FastCGI (mod_fcgid) ──
+SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+
+# ── Sécurité : cacher les fichiers sensibles ──────────────────
+RewriteRule ^\.installed$ - [F,L]
+RewriteRule ^\.htaccess$ - [F,L]
+
+# ── Interdire les scripts de diagnostic racine (non gardés) ───
+# _check_state.php imprime la matrice complète des droits,
+# _test_roles.php et _test_api.php exécutent de VRAIES connexions SSO
+# et modifient l'état des sessions rien qu'en étant appelés.
+RewriteRule ^_(test|check|apply|split).*\.php$ - [F,L]
+
+# ── Rediriger vers install.php si pas encore installé ─────────
+RewriteCond %{DOCUMENT_ROOT}/IAM-Local/.installed !-f
+RewriteCond %{REQUEST_URI} !^/IAM-Local/install\.php
+RewriteCond %{REQUEST_URI} !^/IAM-Local/install\.php$
+RewriteRule ^(.*)$ /IAM-Local/install.php [R=302,L]
+
+# ── En-têtes de sécurité ─────────────────────────────────────
+# Les en-têtes CORS ne sont volontairement PAS définis ici. Voir
+# api/.htaccess : les réponses de l'API sont produites par PHP, qui
+# applique le paramètre « cors_origins ». Les définir ici les
+# écrasait et rendait ce paramètre inopérant.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'"
+    Header set Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=()"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+</IfModule>
+
+# ── Empêcher l'accès direct aux dossiers config/includes/sql ─
+<IfModule mod_rewrite.c>
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^includes/ - [F,L]
+    RewriteRule ^sql/ - [F,L]
+    RewriteRule ^client/ - [F,L]
+</IfModule>
+
+# ── Définir le type par défaut ────────────────────────────────
+<IfModule mod_mime.c>
+    AddType text/html .php
+</IfModule>
+
+# ── Cacher les fichiers .php du listing ───────────────────────
+Options -Indexes

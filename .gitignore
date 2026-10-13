@@ -1,0 +1,47 @@
+# Dépendances
+/vendor/
+/node_modules/
+
+# Configuration locale et secrets
+.env
+.env.*
+!.env.example
+config/config.local.php
+config/config.php
+
+# État local d'installation (créé par install.php)
+/.installed
+
+# Logs
+*.log
+/logs/
+
+# Captures d'écran (binaires, versionnées séparément si besoin)
+/docs/captures/*.png
+/docs/captures/*.jpg
+/docs/captures/*.jpeg
+!/docs/captures/README.md
+!/docs/captures/.gitkeep
+
+# Uploads et cache
+/uploads/
+/tmp/
+/cache/
+
+# Scripts de diagnostic à la racine
+/_test_*.php
+/_apply_*.php
+/_check_state*.php
+
+# IDE et OS
+.idea/
+.vscode/
+!.vscode/settings.json
+Thumbs.db
+.DS_Store
+*.swp
+*~
+
+# PHP
+composer.lock
+.phpunit.result.cache

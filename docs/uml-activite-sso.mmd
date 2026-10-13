@@ -1,0 +1,81 @@
+flowchart LR
+    subgraph USER["Utilisateur"]
+        direction TB
+        uOpen([Ouvre une application])
+        uCredentials[Saisit identifiant et mot de passe]
+        uMfa[Saisit le code MFA]
+        uAction[Demande une page ou une action]
+        uResult([Voit la page ou le refus])
+    end
+
+    subgraph APP["Application cliente"]
+        direction TB
+        appGuard[Intercepte la requete et redirige vers IAM]
+        appCallback[Reçoit sso_token au callback]
+        appExchange[Appelle POST api/sso/validate.php]
+        appSession[Ouvre la session locale avec roles et permissions]
+        appCheck[Controle la permission de la route et de l'action]
+        appWrite[Execute l'ecriture metier]
+    end
+
+    subgraph IAM["IAM-Local"]
+        direction TB
+        iamAuthorize[Traite sso/authorize.php]
+        appDecision{Application active?}
+        loginDecision{Session IAM valide?}
+        credentialDecision{Compte actif et credentials valides?}
+        mfaDecision{MFA requis et valide?}
+        grantDecision{Role sur l'application ou admin global?}
+        issueToken[Emet un jeton SSO a usage unique]
+        validateDecision{Jeton valide et code app identique?}
+        userDecision{Utilisateur actif?}
+        profile[Construit profil scope app_id roles permissions]
+        permissionDecision{Permission demandee presente?}
+        writeDecision{Action d'ecriture?}
+        writePermission{Permission d'ecriture presente?}
+        denied[Retourne 401 / 403]
+        audit[Enregistre l'evenement sensible]
+    end
+
+    subgraph DB["Base iam_local"]
+        direction TB
+        dbApp[Lit application active et URL]
+        dbUser[Lit compte et statut]
+        dbGrant[Lit user_roles pour application_id]
+        dbMfa[Verifie OTP / appareil MFA]
+        dbIssue[Insere sso_tokens avec expiration]
+        dbConsume[Verrouille et consomme atomiquement le jeton]
+        dbProfile[Charge roles et permissions de l'application cible]
+        dbAudit[Insere audit_logs]
+    end
+
+    uOpen --> appGuard --> iamAuthorize --> dbApp --> appDecision
+    appDecision -- non --> deniedApp[Application inconnue ou inactive]
+    appDecision -- oui --> loginDecision
+    loginDecision -- non --> uCredentials --> dbUser --> credentialDecision
+    credentialDecision -- non --> denied
+    credentialDecision -- oui --> mfaDecision
+    loginDecision -- oui --> mfaDecision
+    mfaDecision -- oui --> uMfa --> dbMfa --> mfaDecision
+    mfaDecision -- non requis ou valide --> dbGrant --> grantDecision
+    grantDecision -- non --> denied
+    grantDecision -- oui --> issueToken --> dbIssue --> appCallback
+    appCallback --> appExchange --> dbConsume --> validateDecision
+    validateDecision -- non --> denied
+    validateDecision -- oui --> dbUser --> userDecision
+    userDecision -- non --> denied
+    userDecision -- oui --> dbProfile --> profile --> appSession --> uAction --> appCheck
+    appCheck --> permissionDecision
+    permissionDecision -- non --> denied
+    permissionDecision -- oui --> writeDecision
+    writeDecision -- non lecture --> uResult
+    writeDecision -- oui --> writePermission
+    writePermission -- non --> denied
+    writePermission -- oui --> appWrite --> audit --> dbAudit --> uResult
+    deniedApp --> uResult
+    denied --> uResult
+
+    classDef allowed fill:#e7f6ec,stroke:#238636,color:#111
+    classDef refused fill:#fff0f0,stroke:#cf222e,color:#111
+    class issueToken,appSession,appWrite,dbConsume,dbAudit allowed
+    class deniedApp,denied refused

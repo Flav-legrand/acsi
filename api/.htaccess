@@ -1,0 +1,47 @@
+# ============================================================
+# IAM-Local — API : CORS (pré-vol) + en-têtes de sécurité
+#
+# Les RÉPONSES RÉELLES sont produites par PHP
+# (includes/functions.php → iam_cors_headers), qui lit le paramètre
+# « cors_origins » de la table settings. Ce fichier ne traite QUE le
+# pré-vol OPTIONS.
+#
+# Pourquoi : mod_headers agit pendant la fixation de la réponse et
+# écrase les en-têtes émis par header() en PHP. Les directives
+# inconditionnelles qui figuraient ici (« Allow-Origin: * » sur
+# toutes les méthodes) rendaient le paramètre cors_origins
+# totalement inopérant : un administrateur qui restreignait la liste
+# des origines dans Administration > Paramètres obtenait quand même
+# une API ouverte à tous.
+#
+# Le pré-vol se contente d'échoquer l'origine : un pré-vol réussi
+# n'autorise rien, seul l'en-tête de la réponse réelle décide, et
+# c'est PHP qui le décide.
+# ============================================================
+
+RewriteEngine On
+
+# ── Reprendre l'origine de la requête pour l'écho du pré-vol ──
+SetEnvIf Origin "(.+)" IAM_CORS_ORIGIN=%1
+SetEnvIf Origin "!^(.*)" IAM_CORS_ORIGIN=
+
+<IfModule mod_headers.c>
+    <If "%{REQUEST_METHOD} == 'OPTIONS'">
+        Header always set Access-Control-Allow-Origin   "%{IAM_CORS_ORIGIN}e"
+        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Header always set Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, X-IAM-Device"
+        Header always set Access-Control-Max-Age "86400"
+        Header always set Access-Control-Expose-Headers "X-RateLimit-Remaining, X-RateLimit-Reset"
+    </If>
+
+    # PUT et DELETE sont volontairement autorisés : api/user_edit.php
+    # n'implémente que ces deux méthodes. La restriction à
+    # « GET, POST, OPTIONS » faisait échouer le pré-vol des clients
+    # situés sur une autre origine (le client React sur :5173), qui
+    # ne pouvait alors plus modifier ni supprimer un utilisateur.
+
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+</IfModule>
+
+Options -Indexes
