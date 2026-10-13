@@ -48,6 +48,30 @@ function install_detect_base_path(string $baseUrl): string {
 }
 
 /**
+ * Remplace chaque « /*@NOM*\/ 'valeur par défaut' » du modèle de
+ * configuration par la valeur fournie (échappée par var_export).
+ */
+function install_render_config_template(string $template, array $values): string {
+    return preg_replace_callback(
+        "~/\\*@([A-Z_]+)\\*/\\s*'(?:[^'\\\\]|\\\\.)*'~",
+        static function (array $m) use ($values): string {
+            return array_key_exists($m[1], $values) ? var_export((string) $values[$m[1]], true) : $m[0];
+        },
+        $template
+    );
+}
+
+/** Constantes requises absentes du code généré (config.php + config.local.php). */
+function install_config_missing_constants(string $code): array {
+    require_once __DIR__ . '/includes/config_constants.php';
+    $missing = [];
+    foreach (iam_required_config_constants() as $name) {
+        if (!preg_match("/define\\('" . $name . "'/", $code)) $missing[] = $name;
+    }
+    return $missing;
+}
+
+/**
  * Génère un mot de passe conforme à la politique par défaut (maj, min, chiffre, spécial).
  */
 function install_generate_password(): string {
@@ -342,58 +366,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$alreadyInstalled) {
 
         // 6. Écrire config.php
         if ($step !== 'error') {
+            // config.php : copie COMPLÈTE de config/config.template.php
+            // (toutes les constantes attendues, politique MFA incluse) ;
+            // secrets à part dans config.local.php (non versionné).
             $jwtSecret = bin2hex(random_bytes(32));
-            $cfg  = "<?php\n";
-            $cfg .= "// " . $iamName . " — Configuration centrale (auto-généré par l'installateur)\n";
-            $cfg .= "define('IAM_BASE_URL',   '" . addslashes($baseUrl) . "');\n";
-            $cfg .= "define('IAM_NAME',       '" . addslashes($iamName) . "');\n";
-            $cfg .= "// Code de l'application IAM dont le rôle local 'admin' porte l'administration\n";
-            $cfg .= "define('IAM_ADMIN_APP_CODE', 'iam-admin');\n";
-            $cfg .= "define('IAM_VERSION',    '1.0.0');\n";
-            $cfg .= "define('IAM_TAGLINE',    'Accès sécurisé aux applications');\n";
-            $cfg .= "\n";
-            $cfg .= "// Base de données\n";
-            $cfg .= "define('DB_HOST',  '" . addslashes($dbHost) . "');\n";
-            $cfg .= "define('DB_USER',  '" . addslashes($dbUser) . "');\n";
-            $cfg .= "define('DB_PASS',  '" . addslashes($dbPass) . "');\n";
-            $cfg .= "define('DB_NAME',  '" . addslashes($dbName) . "');\n";
-            $cfg .= "define('DB_PORT',  '" . addslashes((string) $dbPort) . "');\n";
-            $cfg .= "\n";
-            $cfg .= "// Session PHP\n";
-            $cfg .= "define('SESSION_LIFETIME',   3600);\n";
-            $cfg .= "define('IDLE_TIMEOUT',       1800);\n";
-            $cfg .= "define('SESSION_COOKIE_NAME','iam_session');\n";
-            $cfg .= "\n";
-            $cfg .= "// SSO\n";
-            $cfg .= "define('SSO_TOKEN_LIFETIME', 60);\n";
-            $cfg .= "\n";
-            $cfg .= "// JWT\n";
-            $cfg .= "define('IAM_JWT_SECRET',    '" . $jwtSecret . "');\n";
-            $cfg .= "\n";
-            $cfg .= "// MFA\n";
-            $cfg .= "define('OTP_LENGTH',    6);\n";
-            $cfg .= "define('OTP_LIFETIME',  300);\n";
-            $cfg .= "define('OTP_MAX_TRIES', 5);\n";
-            $cfg .= "\n";
-            $cfg .= "// Anti force brute\n";
-            $cfg .= "define('MAX_LOGIN_ATTEMPTS', 5);\n";
-            $cfg .= "define('LOCKOUT_MINUTES',    30);\n";
-            $cfg .= "\n";
-            $cfg .= "// SMTP (optionnel pour MFA email)\n";
-            $cfg .= "define('SMTP_HOST',  'smtp.gmail.com');\n";
-            $cfg .= "define('SMTP_PORT',  465);\n";
-            $cfg .= "define('SMTP_USER',  '');\n";
-            $cfg .= "define('SMTP_PASS',  '');\n";
-            $cfg .= "define('SMTP_FROM',  '');\n";
-            $cfg .= "define('SMTP_FROM_NAME', '" . addslashes($iamName) . "');\n";
-            $cfg .= "\n";
-            $cfg .= "// Upload\n";
-            $cfg .= "define('UPLOAD_DIR', __DIR__ . '/uploads/');\n";
-            $cfg .= "define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024);\n";
+            $template = @file_get_contents($configDir . '/config.template.php');
+            if ($template === false) {
+                $messages[] = ['type' => 'danger', 'text' => 'Modèle config/config.template.php introuvable : configuration non écrite.'];
+                $step = 'error';
+            } else {
+                $cfg = install_render_config_template($template, [
+                    'IAM_BASE_URL'   => $baseUrl,
+                    'IAM_NAME'       => $iamName,
+                    'SMTP_FROM_NAME' => $iamName,
+                ]);
+                $local  = "<?php\n";
+                $local .= "// Secrets locaux (générés par install.php le " . date('Y-m-d H:i') . ", NON versionnés)\n";
+                $local .= "define('DB_HOST', " . var_export($dbHost, true) . ");\n";
+                $local .= "define('DB_USER', " . var_export($dbUser, true) . ");\n";
+                $local .= "define('DB_PASS', " . var_export($dbPass, true) . ");\n";
+                $local .= "define('DB_NAME', " . var_export($dbName, true) . ");\n";
+                $local .= "define('DB_PORT', " . var_export((string) $dbPort, true) . ");\n";
+                $local .= "define('IAM_JWT_SECRET', " . var_export($jwtSecret, true) . ");\n";
+                $local .= "define('SMTP_USER', '');\n";
+                $local .= "define('SMTP_PASS', '');\n";
+                $local .= "define('OAUTH_GOOGLE_CLIENT_SECRET', '');\n";
+                $local .= "define('OAUTH_MICROSOFT_CLIENT_SECRET', '');\n";
 
-            if (!is_dir($configDir)) { mkdir($configDir, 0755, true); }
-            @file_put_contents($configFile, $cfg);
-            $messages[] = ['type' => 'success', 'text' => 'Fichier de configuration écrit.'];
+                if (!is_dir($configDir)) { mkdir($configDir, 0755, true); }
+                $missing = install_config_missing_constants($cfg . $local);
+                if ($missing) {
+                    $messages[] = ['type' => 'danger', 'text' => 'Configuration générée incomplète (' . implode(', ', $missing) . ') : non écrite.'];
+                    $step = 'error';
+                } elseif (@file_put_contents($configDir . '/config.local.php', $local) === false
+                       || @file_put_contents($configFile, $cfg) === false) {
+                    $messages[] = ['type' => 'danger', 'text' => 'Impossible d\'écrire config/config.php ou config/config.local.php (droits du dossier config/).'];
+                    $step = 'error';
+                } else {
+                    $messages[] = ['type' => 'success', 'text' => 'Fichier de configuration écrit (config.php complet + config.local.php).'];
+                }
+            }
         }
 
         // 7. Réécrire .htaccess avec le bon chemin de dossier

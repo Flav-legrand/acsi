@@ -3,6 +3,17 @@
 Format : une entrée par correctif, la plus récente en haut.
 Aucune des failles ci-dessous n'a fait l'objet d'une référence CVE : elles ont été relevées en revue interne avant toute diffusion publique.
 
+## [1.0.3] — 2026-10-13
+
+### Correctif — `install.php` écrivait un `config.php` incomplet
+
+- **Faille** : sur une installation neuve, `config.php` ne définissait ni `MFA_FORCE_ALL` ni les constantes `OAUTH_GOOGLE_*` et `OAUTH_MICROSOFT_*`. La première connexion provoquait une erreur fatale (`Undefined constant "MFA_FORCE_ALL"`).
+- **Correctif** : nouveau modèle `config/config.template.php` qui contient toutes les constantes. `install.php` le copie en substituant URL et nom, et écrit les secrets dans `config/config.local.php`. Il refuse d'écrire une configuration incomplète. Nouveau contrôle `iam_check_config_integrity()` (`includes/config_bootstrap.php`) : page d'erreur claire si une constante manque.
+- **Politique MFA inchangée** : `MFA_FORCE_ALL = true`, administrateurs exemptés (condition de `login.php` non modifiée).
+- **Impact** : aucun sur l'installation existante. Aucun sur les applications de test partenaires et stages-emplois.
+- **Vérification** : installation neuve de bout en bout, voir `docs/installation.md` §6.
+- **Référence** : CVE : aucune (défaut de robustesse).
+
 ## [1.0.2] — 2026-10-13
 
 ### Sécurité — renouvellement de jeton sans vérification du secret client

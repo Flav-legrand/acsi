@@ -1,6 +1,6 @@
 <?php
 // IAM-Local — Connexion à la base de données (singleton PDO)
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/config_bootstrap.php';
 
 function db(): PDO
 {

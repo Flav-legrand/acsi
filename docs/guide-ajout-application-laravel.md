@@ -278,7 +278,7 @@ Ces comportements existaient avant ce chantier. Le squelette Laravel s'en protè
 2. ~~**Le renouvellement (`grant_type=refresh_token`) ne vérifie pas le secret**~~ — **corrigé (§9.2)**.
 3. **Le consentement OIDC est redemandé à chaque connexion** : il n'est pas mémorisé.
 4. **Les administrateurs IAM ne passent pas par la MFA** (`login.php` et `oauth.php`).
-5. **`install.php` écrit un `config/config.php` sans `MFA_FORCE_ALL`** (ni les constantes `OAUTH_GOOGLE_*` et `OAUTH_MICROSOFT_*`) : sur une installation neuve, la première connexion d'un compte provoque une erreur fatale (`Undefined constant "MFA_FORCE_ALL"`). La configuration actuelle les contient, car elles ont été ajoutées à la main.
+5. ~~**`install.php` écrit un `config/config.php` sans `MFA_FORCE_ALL`**~~ — **corrigé (v1.0.3)** : `config/config.template.php` complet, contrôle d’\intégrité au démarrage ; voir `docs/installation.md`.
 6. **`generer.py` propose par défaut les piles `react` et `express`**, dont les gabarits sont absents de `piles/` (seul `django/iam.py.gabarit` existe, et `piles/commun/` est absent).
 
 Les points 5 et 6 relèvent du chantier 3 (nettoyage et configuration). Les points 1 à 4 demandent une décision de votre part.

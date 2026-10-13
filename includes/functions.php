@@ -2,7 +2,7 @@
 // IAM-Local — Fonctions utilitaires : authentification, audit, jetons, validation
 
 require_once __DIR__ . '/db.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/config_bootstrap.php';
 
 /* ========================================================
    SESSION
