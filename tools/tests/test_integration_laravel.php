@@ -34,8 +34,7 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 
-require_once __DIR__ . '/../../includes/functions.php';
-require_once __DIR__ . '/../../includes/oauth.php';
+require_once __DIR__ . '/lib_iam_test.php';
 
 $opts = getopt('', ['app:', 'password:', 'app-url::', 'modes::', 'user::']);
 $appCode  = (string) ($opts['app'] ?? '');
@@ -104,77 +103,9 @@ $accounts = array_values(array_filter($st->fetchAll(), fn ($u) => $onlyUser === 
 ok($accounts !== [], count($accounts) . ' compte(s) de test');
 
 /* ================================================================
-   2. NAVIGATEUR MINIMAL (cURL + cookies)
+   2. NAVIGATEUR MINIMAL (cURL + cookies) — voir lib_iam_test.php
    ================================================================ */
-final class Browser
-{
-    private string $jar;
-
-    public function __construct()
-    {
-        $this->jar = tempnam(sys_get_temp_dir(), 'iamtest');
-    }
-
-    public function __destruct()
-    {
-        @unlink($this->jar);
-    }
-
-    /** @return array{0:int,1:string,2:string} statut, corps, en-tête Location */
-    public function request(string $method, string $url, array $form = [], array $headers = []): array
-    {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HEADER         => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_COOKIEJAR      => $this->jar,
-            CURLOPT_COOKIEFILE     => $this->jar,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_USERAGENT      => 'iam-test-integration/1.0',
-            CURLOPT_HTTPHEADER     => $headers,
-        ]);
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($form));
-        }
-        $raw = curl_exec($ch);
-        if ($raw === false) {
-            throw new RuntimeException("Requête impossible vers $url : " . curl_error($ch));
-        }
-        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        curl_close($ch);
-        $head = substr($raw, 0, $headerSize);
-        $location = preg_match('/^Location:\s*(.+)$/mi', $head, $m) ? trim($m[1]) : '';
-        return [$status, substr($raw, $headerSize), $location];
-    }
-
-    public static function resolve(string $base, string $location): string
-    {
-        if (preg_match('#^https?://#i', $location)) return $location;
-        $p = parse_url($base);
-        $origin = $p['scheme'] . '://' . $p['host'] . (isset($p['port']) ? ':' . $p['port'] : '');
-        if (str_starts_with($location, '/')) return $origin . $location;
-        $dir = preg_replace('#/[^/]*$#', '/', $p['path'] ?? '/');
-        return $origin . $dir . $location;
-    }
-
-    public static function formFields(string $html): array
-    {
-        if (!str_contains($html, '<form')) return [];
-        $dom = new DOMDocument();
-        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
-        $xp = new DOMXPath($dom);
-        $form = $xp->query('//form[translate(@method,"post","POST")="POST"]')->item(0);
-        if (!$form) return [];
-        $fields = [];
-        foreach ($xp->query('.//input[@name]', $form) as $in) {
-            $fields[$in->getAttribute('name')] = $in->getAttribute('value');
-        }
-        return $fields;
-    }
-}
+class_alias(IamTestBrowser::class, 'Browser');
 
 /**
  * Déroule la connexion jusqu'au retour dans l'application.
@@ -208,6 +139,30 @@ function iam_test_login(Browser $b, string $start, string $appUrl, array $accoun
         $method = 'POST'; $form = $fields;
     }
     throw new RuntimeException('trop de redirections');
+}
+
+/* ================================================================
+   2 bis. CONTRÔLE D'ACCÈS OAUTH : un compte SANS rôle sur
+   l'application doit recevoir access_denied (aucun code émis).
+   Compte temporaire créé puis supprimé ; l'application Laravel
+   n'a pas besoin de tourner pour cette vérification.
+   ================================================================ */
+if ($client && in_array('oidc', $modes, true)) {
+    echo "\n== Compte sans rôle sur « $appCode » — autorisation OIDC\n";
+    $fx = new IamTestFixtures();
+    $tmpPassword = 'Zz!' . bin2hex(random_bytes(8));
+    $noRole = $fx->user('sans-role', $tmpPassword);
+    $state = bin2hex(random_bytes(8));
+    [$authUrl] = iam_test_authorize_url($client['client_id'], $state, "$appUrl/callback");
+    try {
+        $r = iam_test_authorize(new IamTestBrowser(), $authUrl, "$appUrl/callback", $noRole, $tmpPassword);
+        $deny = preg_match('/id="oauth-access-denied" href="([^"]+)"/', $r['body'], $m) ? html_entity_decode($m[1]) : $r['location'];
+        $q = iam_test_query($deny);
+        ok(($q['error'] ?? '') === 'access_denied' && empty($q['code']), 'Sans rôle : access_denied, aucun code émis');
+    } catch (RuntimeException $e) {
+        ok(false, 'Sans rôle : ' . $e->getMessage());
+    }
+    $fx->cleanup();
 }
 
 /* ================================================================

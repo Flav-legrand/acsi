@@ -270,11 +270,11 @@ Les tests ont tourné sur une copie de l'IAM (schéma, seeds métier, migration 
 
 ---
 
-## 9. Points de vigilance relevés dans l'IAM (non modifiés)
+## 9. Points de vigilance relevés dans l'IAM
 
-Ces comportements existaient avant ce chantier. Le squelette Laravel s'en protège, mais ils concernent toutes les applications :
+Ces comportements existaient avant ce chantier. Le squelette Laravel s'en protège, mais ils concernent toutes les applications. L'état de chaque point est indiqué ; le détail des correctifs est en §9.1 et suivants, et dans `docs/CHANGELOG.md`.
 
-1. **`oauth.php` délivre un code à tout utilisateur connecté**, qu'il ait ou non un rôle sur l'application. `sso/authorize.php`, lui, vérifie l'accès. Le squelette Laravel refuse un compte sans rôle (403), mais une autre application OIDC pourrait ne pas le faire.
+1. ~~**`oauth.php` délivre un code à tout utilisateur connecté**~~ — **corrigé (§9.1)**.
 2. **Le renouvellement (`grant_type=refresh_token`) ne vérifie pas le secret** d'un client confidentiel : seul le refresh token est contrôlé.
 3. **Le consentement OIDC est redemandé à chaque connexion** : il n'est pas mémorisé.
 4. **Les administrateurs IAM ne passent pas par la MFA** (`login.php` et `oauth.php`).
@@ -282,3 +282,31 @@ Ces comportements existaient avant ce chantier. Le squelette Laravel s'en protè
 6. **`generer.py` propose par défaut les piles `react` et `express`**, dont les gabarits sont absents de `piles/` (seul `django/iam.py.gabarit` existe, et `piles/commun/` est absent).
 
 Les points 5 et 6 relèvent du chantier 3 (nettoyage et configuration). Les points 1 à 4 demandent une décision de votre part.
+
+### 9.1 Correctif — rôle obligatoire avant l'émission du code
+
+**Avant** : `oauth.php` émettait un code d'autorisation à tout utilisateur authentifié à l'IAM, même sans aucun rôle sur l'application du client.
+
+**Maintenant** : après l'authentification (et la MFA le cas échéant) et **avant** l'écran de consentement, `oauth.php` appelle `iam_user_has_role_on_application($userId, $client['application_id'])` (`includes/functions.php`). La fonction exige un rôle attribué sur cette application (`user_roles.application_id`) **et** appartenant à cette application (`roles.application_id`).
+
+Sans rôle :
+
+- l'utilisateur voit un écran « Accès refusé » (HTTP 403) qui explique la situation, avec un lien vers le portail et un lien de retour vers l'application ;
+- le lien de retour, comme toute soumission du formulaire de consentement, renvoie vers `redirect_uri?error=access_denied&error_description=…&state=…` (RFC 6749 §4.1.2.1) ;
+- aucun code n'est enregistré dans `oauth_codes` ;
+- l'événement est journalisé dans `audit_logs` : `action = oauth_authorize_denied`, `details = {"raison":"no_role_on_application","application_id":…,"client_id":…}`, avec utilisateur, IP, user-agent et horodatage. Un client sans application liée donne `raison = client_without_application`.
+
+Points à connaître :
+
+- **Aucune exception pour l'administrateur IAM** : il doit, lui aussi, porter un rôle sur l'application pour s'y connecter en OIDC. Le SSO maison (`sso/authorize.php`) laisse toujours passer l'administrateur IAM ; ce comportement n'a pas été modifié.
+- Côté Laravel, rien à changer : `IamAuthController::callback` affiche déjà `error_description` quand l'IAM renvoie `?error=`.
+- Impact sur les applications de test : **partenaires** et **stages-emplois** ne sont pas affectées tant que les comptes de test gardent leur rôle sur l'application. Un compte sans rôle reçoit désormais `access_denied` dès l'IAM, au lieu d'un 403 côté Laravel.
+
+Vérification :
+
+```bash
+php tools/tests/test_oauth_securite.php
+php tools/tests/test_integration_laravel.php --app=partenaires --password=<mot de passe démo>
+```
+
+Le premier test crée ses propres données temporaires et n'a besoin d'aucune application cliente. Le second contient la section « Compte sans rôle » (un compte temporaire, supprimé en fin de test).

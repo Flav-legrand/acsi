@@ -24,10 +24,15 @@ $codeChallenge       = $prm['code_challenge'] ?? '';
 $codeChallengeMethod = $prm['code_challenge_method'] ?? 'plain';
 $nonce         = $prm['nonce'] ?? '';
 
-function oauth_redirect_error(string $redirectUri, string $error, string $desc, string $state): void
+function oauth_error_url(string $redirectUri, string $error, string $desc, string $state): string
 {
     $sep = (strpos($redirectUri, '?') === false) ? '?' : '&';
-    header('Location: ' . $redirectUri . $sep . 'error=' . urlencode($error) . '&error_description=' . urlencode($desc) . '&state=' . urlencode($state));
+    return $redirectUri . $sep . 'error=' . urlencode($error) . '&error_description=' . urlencode($desc) . '&state=' . urlencode($state);
+}
+
+function oauth_redirect_error(string $redirectUri, string $error, string $desc, string $state): void
+{
+    header('Location: ' . oauth_error_url($redirectUri, $error, $desc, $state));
     exit;
 }
 
@@ -71,6 +76,58 @@ if (!iam_is_logged_in()) {
 $uid = (int) $_SESSION['iam_user']['id'];
 if (!empty($_SESSION['iam_mfa_required']) && empty($_SESSION['iam_mfa_verified']) && !iam_user_is_admin($uid)) {
     header('Location: ' . IAM_BASE_URL . '/mfa.php?return=' . urlencode($returnNow));
+    exit;
+}
+
+// ── Contrôle d'accès : au moins un rôle sur l'application du client ──
+// Vérifié AVANT l'écran de consentement et avant toute émission de code :
+// être authentifié à l'IAM ne suffit pas pour entrer dans une application.
+$clientAppId = (int) ($client['application_id'] ?? 0);
+if (!iam_user_has_role_on_application($uid, $clientAppId)) {
+    $reason   = $clientAppId > 0 ? 'no_role_on_application' : 'client_without_application';
+    $denyDesc = 'Vous ne disposez d’aucun rôle sur cette application.';
+    $denyUrl  = oauth_error_url($redirectUri, 'access_denied', $denyDesc, $state);
+    iam_oauth_log_event($clientId, $uid, 'authorization_denied');
+    iam_audit('oauth_authorize_denied',
+        json_encode(['raison' => $reason, 'application_id' => $clientAppId ?: null, 'client_id' => $clientId], JSON_UNESCAPED_UNICODE),
+        $uid, $_SESSION['iam_user']['email'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', $client['name']);
+    if ($isPostReq) {
+        header('Location: ' . $denyUrl);
+        exit;
+    }
+    http_response_code(403);
+    ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accès refusé — <?php echo htmlspecialchars(IAM_NAME); ?></title>
+<link rel="stylesheet" href="<?php echo htmlspecialchars(IAM_BASE_URL); ?>/assets/css/iam.css">
+</head>
+<body class="auth-body">
+<div class="auth-card">
+    <div class="auth-logo">
+        <div class="logo-badge"><img src="<?php echo htmlspecialchars(IAM_BASE_URL); ?>/images/acsi.jpg" alt="ACSI"></div>
+        <h1>Accès refusé</h1>
+        <p>Vous êtes bien connecté à l'IAM, mais vous n'avez <strong>aucun rôle</strong> sur l'application
+        <strong><?php echo htmlspecialchars($client['name']); ?></strong>.</p>
+    </div>
+    <div class="alert alert-danger">
+        Demandez à un administrateur IAM de vous attribuer un rôle sur cette application
+        (Administration &gt; Utilisateurs &gt; Rôles), puis reconnectez-vous.
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+        <a class="btn btn-primary btn-block" href="<?php echo htmlspecialchars(IAM_BASE_URL); ?>/portal.php">Retour au portail</a>
+        <a class="btn btn-outline btn-block" id="oauth-access-denied" href="<?php echo htmlspecialchars($denyUrl); ?>">Revenir à l'application</a>
+    </div>
+    <div class="auth-footer">
+        <?php echo htmlspecialchars(IAM_NAME); ?> — erreur OAuth 2.0 : access_denied
+    </div>
+</div>
+</body>
+</html>
+<?php
     exit;
 }
 

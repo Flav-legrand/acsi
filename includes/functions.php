@@ -344,6 +344,24 @@ function iam_user_has_permission(int $user_id, string $permissionCode, ?int $app
     return $stmt->fetchColumn() > 0;
 }
 
+/**
+ * L'utilisateur porte-t-il au moins un rôle sur l'application ?
+ * Le rôle doit être attribué SUR cette application (user_roles) ET
+ * appartenir à cette application (roles.application_id) : un rôle
+ * d'une autre application rattaché par erreur ne donne pas l'accès.
+ * Aucune exception pour l'administrateur IAM : il doit lui aussi
+ * porter un rôle sur l'application pour s'y connecter en OAuth/OIDC.
+ */
+function iam_user_has_role_on_application(int $user_id, int $app_id): bool
+{
+    if ($app_id <= 0) return false;
+    $stmt = db()->prepare('SELECT COUNT(*) FROM user_roles ur
+        INNER JOIN roles r ON r.id = ur.role_id
+        WHERE ur.user_id = ? AND ur.application_id = ? AND r.application_id = ?');
+    $stmt->execute([$user_id, $app_id, $app_id]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
 /* ========================================================
    RÔLES PAR APPLICATION (client roles — modèle Keycloak)
    ======================================================== */
