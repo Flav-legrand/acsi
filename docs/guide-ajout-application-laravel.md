@@ -275,7 +275,7 @@ Les tests ont tourné sur une copie de l'IAM (schéma, seeds métier, migration 
 Ces comportements existaient avant ce chantier. Le squelette Laravel s'en protège, mais ils concernent toutes les applications. L'état de chaque point est indiqué ; le détail des correctifs est en §9.1 et suivants, et dans `docs/CHANGELOG.md`.
 
 1. ~~**`oauth.php` délivre un code à tout utilisateur connecté**~~ — **corrigé (§9.1)**.
-2. **Le renouvellement (`grant_type=refresh_token`) ne vérifie pas le secret** d'un client confidentiel : seul le refresh token est contrôlé.
+2. ~~**Le renouvellement (`grant_type=refresh_token`) ne vérifie pas le secret**~~ — **corrigé (§9.2)**.
 3. **Le consentement OIDC est redemandé à chaque connexion** : il n'est pas mémorisé.
 4. **Les administrateurs IAM ne passent pas par la MFA** (`login.php` et `oauth.php`).
 5. **`install.php` écrit un `config/config.php` sans `MFA_FORCE_ALL`** (ni les constantes `OAUTH_GOOGLE_*` et `OAUTH_MICROSOFT_*`) : sur une installation neuve, la première connexion d'un compte provoque une erreur fatale (`Undefined constant "MFA_FORCE_ALL"`). La configuration actuelle les contient, car elles ont été ajoutées à la main.
@@ -310,3 +310,31 @@ php tools/tests/test_integration_laravel.php --app=partenaires --password=<mot d
 ```
 
 Le premier test crée ses propres données temporaires et n'a besoin d'aucune application cliente. Le second contient la section « Compte sans rôle » (un compte temporaire, supprimé en fin de test).
+
+### 9.2 Correctif — secret client exigé au renouvellement
+
+**Avant** : `api/oauth/token.php` (`grant_type=refresh_token`) ne vérifiait pas le `client_secret`. Toute personne détenant un refresh token valide obtenait de nouveaux jetons. `api/refresh.php` (SSO maison) acceptait aussi les refresh tokens OAuth, sans aucun client.
+
+**Maintenant** (RFC 6749 §6, RFC 6819 §5.2.2.3) :
+
+| Cas | Réponse | Audit `oauth_refresh_failed` |
+|---|---|---|
+| Client confidentiel sans secret ou avec un mauvais secret (corps POST ou `Authorization: Basic`) | 401 `invalid_client` | `invalid_client_secret` |
+| Aucun `client_id` fourni | 401 `invalid_client` | `invalid_client_secret` |
+| Refresh token émis pour un autre client (ou jeton du SSO maison) | 400 `invalid_grant` | `client_mismatch` |
+| Refresh token déjà utilisé (rotation) ou révoqué | 400 `invalid_grant`, **et révocation de tous les refresh tokens actifs de cet utilisateur pour ce client** | `token_reuse` |
+| Bon client, bon secret, jeton valide | 200 : nouvel `access_token` **et nouveau `refresh_token`** ; l'ancien est invalidé | — (`oauth_refresh` en succès) |
+
+- **Rotation** : chaque renouvellement consomme l'ancien jeton de façon atomique (`UPDATE … WHERE revoked = 0`). Deux requêtes simultanées avec le même jeton sont traitées comme un rejeu.
+- **Client public** : il n'a pas de secret. Il doit fournir son `client_id`, qui doit être celui du jeton, et il bénéficie de la rotation avec détection de rejeu. PKCE reste obligatoire pour lui à l'autorisation ; PKCE ne s'applique pas au refresh, où aucun `code_verifier` n'existe.
+- **`api/refresh.php`** n'accepte plus que les jetons du SSO maison (`client_id IS NULL`).
+
+Côté Laravel, rien à changer : `IamClient::refresh()` envoie déjà `client_id` et `client_secret` dans le corps, et `IamAuth` enregistre le nouveau `refresh_token` renvoyé. Seule conséquence visible : si deux onglets renouvellent au même instant avec le même jeton, le second est traité comme un rejeu et la session est fermée (reconnexion SSO transparente si la session IAM est ouverte).
+
+Impact sur les applications de test **partenaires** et **stages-emplois** : aucun, tant que `IAM_OIDC_CLIENT_SECRET` dans `.env` correspond au secret de l'IAM. Un secret erroné, qui passait auparavant inaperçu au renouvellement, provoque désormais une déconnexion au bout d'une heure, à l'expiration de l'access token.
+
+Vérification :
+
+```bash
+php tools/tests/test_oauth_securite.php
+```

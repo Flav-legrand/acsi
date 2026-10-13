@@ -8,7 +8,9 @@ $refreshToken = $body['refresh_token'] ?? '';
 if (empty($refreshToken)) api_json_response(['error' => 'refresh_token requis.'], 422);
 
 $db = db();
-$stmt = $db->prepare('SELECT rt.*, u.email FROM refresh_tokens rt INNER JOIN users u ON u.id = rt.user_id WHERE rt.token = ? LIMIT 1');
+// Uniquement les jetons du SSO maison (client_id NULL) : un refresh token
+// OAuth se renouvelle sur /api/oauth/token.php, avec authentification du client.
+$stmt = $db->prepare('SELECT rt.*, u.email FROM refresh_tokens rt INNER JOIN users u ON u.id = rt.user_id WHERE rt.token = ? AND rt.client_id IS NULL LIMIT 1');
 $stmt->execute([$refreshToken]);
 $row = $stmt->fetch();
 

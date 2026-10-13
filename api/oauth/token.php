@@ -95,26 +95,71 @@ switch ($grant) {
         break;
 
     /* ------------------------ refresh_token ------------------------ */
+    // RFC 6749 §6 : le client s'authentifie (confidentiel) ou s'identifie
+    // (public) ; le jeton doit lui avoir été émis. RFC 6819 §5.2.2.3 :
+    // rotation à chaque usage, et le rejeu d'un jeton déjà tourné révoque
+    // toute la lignée (utilisateur + client).
     case 'refresh_token':
         $rt = trim($_POST['refresh_token'] ?? '');
         if ($rt === '') iam_oauth_error(400, 'invalid_request', 'refresh_token requis.');
         $db = db();
-        $stmt = $db->prepare("SELECT rt.*, u.status AS ustatus, u.email AS uemail FROM refresh_tokens rt
-                              INNER JOIN users u ON u.id = rt.user_id
-                              WHERE rt.token = ? AND rt.revoked = 0 LIMIT 1");
-        $stmt->execute([$rt]);
-        $row = $stmt->fetch();
-        if (!$row) iam_oauth_error(400, 'invalid_grant', 'refresh_token invalide ou révoqué.');
-        if (strtotime((string) $row['expires_at']) < time()) iam_oauth_error(400, 'invalid_grant', 'refresh_token expiré.');
+
+        $refreshFailed = static function (string $reason, int $status, string $error, string $desc, ?array $row = null, string $clientId = '', ?array $client = null): void {
+            iam_audit('oauth_refresh_failed',
+                json_encode(['raison' => $reason, 'client_id' => $clientId, 'token_client_id' => $row['client_id'] ?? null], JSON_UNESCAPED_UNICODE),
+                isset($row['user_id']) ? (int) $row['user_id'] : null, $row['uemail'] ?? '',
+                $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', $client['name'] ?? null);
+            if ($clientId !== '') iam_oauth_log_event($clientId, isset($row['user_id']) ? (int) $row['user_id'] : null, 'refresh_failed');
+            iam_oauth_error($status, $error, $desc);
+        };
+
+        // 1. Authentification du client
         $clientAuth = iam_oauth_client_auth();
         $clientId = $clientAuth[0] ?? '';
-        if (!empty($row['client_id']) && $row['client_id'] !== $clientId) iam_oauth_error(400, 'invalid_grant', 'Client incohérent.');
-        $client = iam_oauth_client((string) ($row['client_id'] ?: $clientId));
-        if (!$client || (int) $client['is_active'] !== 1) iam_oauth_error(401, 'invalid_client', 'Client introuvable ou inactif.');
+        if ($clientId === '') {
+            $refreshFailed('invalid_client_secret', 401, 'invalid_client', 'client_id requis (et client_secret pour un client confidentiel).');
+        }
+        $client = iam_oauth_client($clientId);
+        if (!$client || (int) $client['is_active'] !== 1) {
+            $refreshFailed('invalid_client_secret', 401, 'invalid_client', 'Client inconnu ou inactif.', null, $clientId);
+        }
+        if (!iam_oauth_client_is_public($client)
+            && !password_verify((string) ($clientAuth[1] ?? ''), (string) ($client['client_secret'] ?? ''))) {
+            $refreshFailed('invalid_client_secret', 401, 'invalid_client', 'Authentification du client échouée.', null, $clientId, $client);
+        }
+
+        // 2. Le jeton, y compris révoqué (pour détecter un rejeu)
+        $stmt = $db->prepare("SELECT rt.*, u.status AS ustatus, u.email AS uemail FROM refresh_tokens rt
+                              INNER JOIN users u ON u.id = rt.user_id
+                              WHERE rt.token = ? LIMIT 1");
+        $stmt->execute([$rt]);
+        $row = $stmt->fetch();
+        if (!$row) iam_oauth_error(400, 'invalid_grant', 'refresh_token invalide.');
+        if ((string) $row['client_id'] !== $clientId) {
+            // Jeton d'un autre client, ou jeton du SSO maison (client_id NULL)
+            $refreshFailed('client_mismatch', 400, 'invalid_grant', 'Ce refresh_token n’a pas été émis pour ce client.', $row, $clientId, $client);
+        }
+        $revokeFamily = static function () use ($db, $row): void {
+            $db->prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND client_id = ? AND revoked = 0')
+               ->execute([(int) $row['user_id'], (string) $row['client_id']]);
+        };
+        if ((int) $row['revoked'] === 1) {
+            $revokeFamily();
+            $refreshFailed('token_reuse', 400, 'invalid_grant', 'refresh_token déjà utilisé ou révoqué.', $row, $clientId, $client);
+        }
+        if (strtotime((string) $row['expires_at']) < time()) iam_oauth_error(400, 'invalid_grant', 'refresh_token expiré.');
         if ($row['ustatus'] !== 'active') iam_oauth_error(400, 'invalid_grant', 'Compte utilisateur indisponible.');
-        // Rotation du refresh token
-        $db->prepare('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?')->execute([(int) $row['id']]);
+
+        // 3. Rotation : l'ancien jeton est consommé atomiquement. Si une
+        //    requête concurrente l'a consommé entre-temps, c'est un rejeu.
+        $consume = $db->prepare('UPDATE refresh_tokens SET revoked = 1 WHERE id = ? AND revoked = 0');
+        $consume->execute([(int) $row['id']]);
+        if ($consume->rowCount() !== 1) {
+            $revokeFamily();
+            $refreshFailed('token_reuse', 400, 'invalid_grant', 'refresh_token déjà utilisé ou révoqué.', $row, $clientId, $client);
+        }
         $tokens = iam_oauth_issue_tokens($client, (int) $row['user_id'], $row['scope'] ?: 'profile');
+        iam_audit('oauth_refresh', "Jetons renouvelés: {$client['name']}", (int) $row['user_id'], $row['uemail'] ?? '', $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', $client['name']);
         echo json_encode($tokens);
         break;
 
